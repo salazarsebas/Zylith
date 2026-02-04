@@ -486,8 +486,8 @@ export STARKNET_KEYSTORE="~/.starkli-wallets/deployer/keystore.json"
 
 ### MVP (Hackathon - Feb 2026)
 - [x] Project setup & architecture
-- [ ] CLMM core (swap, liquidity, fees)
-- [ ] Privacy layer (notes, Merkle tree, nullifiers)
+- [x] CLMM core (swap, liquidity, fees)
+- [x] Privacy layer (notes, Merkle tree, nullifiers)
 - [ ] Circom circuits (membership, swap)
 - [ ] Garaga verifier integration
 - [ ] ASP server

@@ -1,0 +1,39 @@
+# Build artifacts
+target/
+
+# Scarb lock file (optional - remove if you want reproducible builds)
+Scarb.lock
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Garaga generated files
+*.json.gz
+calldata.txt
+
+# Python (for Garaga)
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Node (JS tooling)
+node_modules/
+
+# Test artifacts
+*.log
