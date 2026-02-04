@@ -606,5 +606,7 @@ template PrivateBurn(levels) {
     /////////////////////// END OF LOGIC //////////////////////////
 }
 
-// Main components with 20 levels for Zylith's state tree
-component main {public [root, nullifierHash0, nullifierHash1, positionCommitment, tickLower, tickUpper]} = PrivateMint(20);
+// Note: Main components are defined in separate files for Garaga verifier generation:
+// - mint.circom: PrivateMint entry point
+// - burn.circom: PrivateBurn entry point
+// This allows independent trusted setup and verification key generation for each circuit.

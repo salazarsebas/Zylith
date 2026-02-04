@@ -247,23 +247,35 @@ zylith/
 │   │   └── commitment.cairo          # Commitment utilities
 │   │
 │   ├── verifier/
-│   │   ├── groth16.cairo             # Garaga integration
-│   │   └── interface.cairo           # Verifier interface
+│   │   ├── types.cairo               # Proof and public input types
+│   │   ├── membership_verifier.cairo # Membership proof verifier
+│   │   ├── swap_verifier.cairo       # Swap proof verifier
+│   │   ├── mint_verifier.cairo       # LP mint proof verifier
+│   │   ├── burn_verifier.cairo       # LP burn proof verifier
+│   │   └── coordinator.cairo         # Central verification coordinator
 │   │
 │   ├── interfaces/
 │   │   ├── pool.cairo                # IZylithPool
 │   │   ├── erc20.cairo               # IERC20
-│   │   └── verifier.cairo            # IVerifier
+│   │   ├── verifier.cairo            # IVerifier trait
+│   │   └── coordinator.cairo         # IVerifierCoordinator trait
 │   │
 │   └── lib.cairo                     # Library exports
 │
 ├── circuits/
 │   ├── membership.circom             # Merkle membership proof
 │   ├── swap.circom                   # Private swap verification
-│   ├── liquidity.circom              # LP mint/burn verification
-│   └── common/
-│       ├── poseidon.circom           # Poseidon hash
-│       └── merkle.circom             # Merkle proof helper
+│   ├── liquidity.circom              # LP templates (PrivateMint, PrivateBurn)
+│   ├── mint.circom                   # PrivateMint entry point
+│   ├── burn.circom                   # PrivateBurn entry point
+│   ├── common/
+│   │   ├── commitment.circom         # Zylith commitment scheme
+│   │   ├── poseidon.circom           # Poseidon hash
+│   │   └── merkle.circom             # Merkle proof helper
+│   └── scripts/
+│       ├── compile_circuits.sh       # Circom compilation
+│       ├── setup.sh                  # Trusted setup
+│       └── generate_verifiers.sh     # Garaga verifier generation
 │
 ├── asp/
 │   ├── src/
@@ -489,7 +501,7 @@ export STARKNET_KEYSTORE="~/.starkli-wallets/deployer/keystore.json"
 - [x] CLMM core (swap, liquidity, fees)
 - [x] Privacy layer (notes, Merkle tree, nullifiers)
 - [x] Circom circuits (membership, swap, liquidity)
-- [ ] Garaga verifier integration
+- [x] Garaga verifier integration
 - [ ] ASP server
 - [ ] Basic test coverage
 - [ ] Testnet deployment

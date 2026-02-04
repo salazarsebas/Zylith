@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "description": "Circom circuits for Zylith shielded CLMM",
   "scripts": {
-    "compile:membership": "circom membership.circom --r1cs --wasm --sym -o build/",
-    "compile:swap": "circom swap.circom --r1cs --wasm --sym -o build/",
-    "compile:liquidity": "circom liquidity.circom --r1cs --wasm --sym -o build/",
-    "compile:all": "bun run compile:membership && bun run compile:swap && bun run compile:liquidity",
+    "compile:membership": "circom membership.circom --r1cs --wasm --sym -l node_modules -o build/membership",
+    "compile:swap": "circom swap.circom --r1cs --wasm --sym -l node_modules -o build/swap",
+    "compile:mint": "circom mint.circom --r1cs --wasm --sym -l node_modules -o build/mint",
+    "compile:burn": "circom burn.circom --r1cs --wasm --sym -l node_modules -o build/burn",
+    "compile:all": "bun run compile:membership && bun run compile:swap && bun run compile:mint && bun run compile:burn",
+    "setup": "bash scripts/setup.sh",
+    "generate": "bash scripts/generate_verifiers.sh",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
