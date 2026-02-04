@@ -488,7 +488,7 @@ export STARKNET_KEYSTORE="~/.starkli-wallets/deployer/keystore.json"
 - [x] Project setup & architecture
 - [x] CLMM core (swap, liquidity, fees)
 - [x] Privacy layer (notes, Merkle tree, nullifiers)
-- [ ] Circom circuits (membership, swap)
+- [x] Circom circuits (membership, swap, liquidity)
 - [ ] Garaga verifier integration
 - [ ] ASP server
 - [ ] Basic test coverage

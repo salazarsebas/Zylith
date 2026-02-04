@@ -1,0 +1,41 @@
+# Build artifacts
+build/
+*.r1cs
+*.wasm
+*.sym
+*.zkey
+*.json.ptau
+*.vkey
+*.pkey
+
+# Verification keys
+verification_key.json
+proving_key.json
+
+# Node modules
+node_modules/
+package-lock.json
+
+# Witness files
+witness.wtns
+witness.json
+
+# Testing
+test_vectors/
+*.test.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
