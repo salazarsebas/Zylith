@@ -1,5 +1,7 @@
 /// Liquidity math for CLMM
 /// Calculates token amounts from liquidity and price ranges
+use core::integer::u512_safe_div_rem_by_u256;
+use core::num::traits::WideMul;
 use super::sqrt_price::{ONE, mul_div_ceil, mul_div_floor, mul_q128};
 
 /// Errors
@@ -81,14 +83,23 @@ pub fn get_liquidity_for_amount_0(sqrt_price_a: u256, sqrt_price_b: u256, amount
 
     assert(sqrt_price_upper > sqrt_price_lower, Errors::INVALID_PRICE_RANGE);
 
-    let intermediate = mul_q128(sqrt_price_lower, sqrt_price_upper);
-    let numerator = amount_0 * intermediate;
-    let denominator = (sqrt_price_upper - sqrt_price_lower) * ONE;
+    // Compute: liquidity = amount0 * sqrt_price_lower * sqrt_price_upper / (sqrt_price_upper - sqrt_price_lower)
+    // Rewrite to avoid overflow: liquidity = amount0 * sqrt_price_lower / (sqrt_price_upper - sqrt_price_lower) * sqrt_price_upper / ONE
+    let delta = sqrt_price_upper - sqrt_price_lower;
+    assert(delta > 0, Errors::DIVISION_BY_ZERO);
 
-    assert(denominator > 0, Errors::DIVISION_BY_ZERO);
+    // Step 1: (amount0 * sqrt_price_lower * sqrt_price_upper) / delta / ONE
+    // Using u512 arithmetic via wide_mul to handle the multiplication
+    let numerator1 = amount_0.wide_mul(sqrt_price_lower);
+    let (quotient1, _) = u512_safe_div_rem_by_u256(numerator1, delta.try_into().unwrap());
+    let temp: u256 = quotient1.try_into().expect('Intermediate overflow');
 
-    let liquidity = numerator / denominator;
-    liquidity.try_into().expect('Liquidity overflow')
+    // Step 2: multiply by sqrt_price_upper and divide by ONE
+    let numerator2 = temp.wide_mul(sqrt_price_upper);
+    let (quotient2, _) = u512_safe_div_rem_by_u256(numerator2, ONE.try_into().unwrap());
+    let liquidity: u256 = quotient2.try_into().expect('Liquidity overflow');
+
+    liquidity.try_into().expect('Liquidity exceeds u128')
 }
 
 /// Calculate liquidity from amount1 and price range

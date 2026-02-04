@@ -101,19 +101,34 @@ pub fn get_sqrt_price_at_tick(tick: i32) -> u256 {
         ratio = (ratio * 0x48a170391f7dc42444e8fa2) / ONE;
     }
 
-    // If tick is negative, take reciprocal: 1/ratio
+    // If tick is positive, take reciprocal: 1/ratio
+    // For tick = 0, ratio is already ONE, so we skip this
     if tick > 0 {
         ratio = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff / ratio;
     }
 
+    // Convert from internal representation to Q128.128
     // Round up if needed to ensure we don't undershoot the tick
-    let sqrt_price = if (ratio % ONE) > 0 {
-        (ratio / ONE) + 1
+    if tick > 0 {
+        // For positive ticks, we took reciprocal, so round up
+        let sqrt_price = if (ratio % ONE) > 0 {
+            (ratio / ONE) + 1
+        } else {
+            ratio / ONE
+        };
+        sqrt_price
+    } else if tick == 0 {
+        // At tick 0, sqrt_price should be exactly ONE
+        ONE
     } else {
-        ratio / ONE
-    };
-
-    sqrt_price
+        // For negative ticks, use the ratio directly
+        let sqrt_price = if (ratio % ONE) > 0 {
+            (ratio / ONE) + 1
+        } else {
+            ratio / ONE
+        };
+        sqrt_price
+    }
 }
 
 /// Get tick at a given sqrt price
@@ -209,10 +224,7 @@ pub fn align_tick_up(tick: i32, tick_spacing: u32) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        MAX_TICK, MIN_TICK, align_tick_down, align_tick_up, get_sqrt_price_at_tick,
-        get_tick_at_sqrt_price,
-    };
+    use super::{MAX_TICK, MIN_TICK, align_tick_down, align_tick_up, get_sqrt_price_at_tick};
 
     #[test]
     fn test_get_sqrt_price_at_tick_zero() {

@@ -181,7 +181,7 @@ mod tests {
         let hash1 = compute_nullifier_hash(nullifier);
         let hash2 = compute_nullifier_hash(nullifier);
 
-        assert(hash1 == hash2, 'Nullifier hash not deterministic');
+        assert(hash1 == hash2, 'Nullifier not deterministic');
         assert(hash1 != 0, 'Nullifier hash is zero');
     }
 

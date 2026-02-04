@@ -1,0 +1,30 @@
+{
+  "name": "zylith",
+  "version": "0.1.0",
+  "description": "Shielded CLMM for Bitcoin on Starknet",
+  "scripts": {
+    "build": "bun run build:cairo && bun run build:circuits",
+    "build:cairo": "scarb build",
+    "build:circuits": "cd circuits && mkdir -p build && bun run compile:all",
+    "build:circuits:membership": "cd circuits && bun run compile:membership",
+    "build:circuits:swap": "cd circuits && bun run compile:swap",
+    "build:circuits:liquidity": "cd circuits && bun run compile:liquidity",
+    "test": "bun run test:cairo",
+    "test:cairo": "scarb test",
+    "clean": "bun run clean:cairo && bun run clean:circuits",
+    "clean:cairo": "rm -rf target",
+    "clean:circuits": "rm -rf circuits/build",
+    "install:circuits": "cd circuits && bun install"
+  },
+  "keywords": [
+    "starknet",
+    "cairo",
+    "circom",
+    "privacy",
+    "defi",
+    "bitcoin",
+    "clmm"
+  ],
+  "author": "Zylith Protocol",
+  "license": "MIT"
+}

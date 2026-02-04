@@ -134,8 +134,10 @@ pub fn compute_swap_step(
     };
 
     // Calculate fee
-    let fee_amount = if exact_input && !reached_target {
-        amount_remaining - amount_in
+    // For exact input: fee is included in amount_in
+    // For exact output: fee is calculated separately on amount_in
+    let fee_amount = if exact_input {
+        calculate_fee_amount(amount_in, fee)
     } else {
         calculate_fee_amount(amount_in, fee)
     };

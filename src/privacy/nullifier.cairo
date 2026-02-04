@@ -102,9 +102,7 @@ pub fn all_unspent(values: Span<bool>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        Errors, all_unspent, any_spent, is_nullifier_spent, is_valid_nullifier, verify_can_spend,
-    };
+    use super::{all_unspent, any_spent, is_nullifier_spent, is_valid_nullifier, verify_can_spend};
 
     #[test]
     fn test_is_valid_nullifier() {

@@ -170,14 +170,14 @@ pub fn cross_tick(
 
 #[cfg(test)]
 mod tests {
-    use starknet::contract_address_const;
+    use starknet::ContractAddress;
     use super::super::fees::StandardFeeTiers;
     use super::{create_pool_key, initialize_pool_state, initialize_tick_info, update_tick};
 
     #[test]
     fn test_create_pool_key() {
-        let token_a = contract_address_const::<0x2>();
-        let token_b = contract_address_const::<0x1>();
+        let token_a: ContractAddress = 0x2.try_into().unwrap();
+        let token_b: ContractAddress = 0x1.try_into().unwrap();
         let fee_tier = StandardFeeTiers::fee_tier_30();
 
         let pool_key = create_pool_key(token_a, token_b, fee_tier);
