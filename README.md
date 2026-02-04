@@ -190,8 +190,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.starkup.sh | sh
 
 2. **Clone the repository**
 ```bash
-git clone https://github.com/your-org/zylith.git
-cd zylith
+git clone https://github.com/salazarsebas/Zylith.git
+cd Zylith
 ```
 
 3. **Install dependencies**
@@ -510,7 +510,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ```bash
 # Fork and clone
-git clone https://github.com/your-username/zylith.git
+git clone https://github.com/salazarsebas/Zylith.git
 
 # Create branch
 git checkout -b feature/your-feature
