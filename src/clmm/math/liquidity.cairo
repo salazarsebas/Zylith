@@ -83,8 +83,10 @@ pub fn get_liquidity_for_amount_0(sqrt_price_a: u256, sqrt_price_b: u256, amount
 
     assert(sqrt_price_upper > sqrt_price_lower, Errors::INVALID_PRICE_RANGE);
 
-    // Compute: liquidity = amount0 * sqrt_price_lower * sqrt_price_upper / (sqrt_price_upper - sqrt_price_lower)
-    // Rewrite to avoid overflow: liquidity = amount0 * sqrt_price_lower / (sqrt_price_upper - sqrt_price_lower) * sqrt_price_upper / ONE
+    // Compute: liquidity = amount0 * sqrt_price_lower * sqrt_price_upper / (sqrt_price_upper -
+    // sqrt_price_lower)
+    // Rewrite to avoid overflow: liquidity = amount0 * sqrt_price_lower / (sqrt_price_upper -
+    // sqrt_price_lower) * sqrt_price_upper / ONE
     let delta = sqrt_price_upper - sqrt_price_lower;
     assert(delta > 0, Errors::DIVISION_BY_ZERO);
 

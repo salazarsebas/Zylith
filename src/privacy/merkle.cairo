@@ -62,54 +62,53 @@ pub fn hash_left_right(left: felt252, right: felt252) -> felt252 {
 /// # Panics
 /// If level > TREE_HEIGHT
 pub fn get_zero_value(level: u32) -> felt252 {
-    // These are precomputed zero values
-    // Level 0: Poseidon hash of "zylith"
-    // Each subsequent level: Poseidon(previous, previous)
-    // Values are truncated to fit felt252 (max ~252 bits)
+    // Precomputed Poseidon zero value chain:
+    // Level 0: Poseidon('zylith_empty')
+    // Level N: Poseidon(zero[N-1], zero[N-1])
+    // Verified by test_zero_value_chain_consistency
 
     if level == 0 {
-        // Poseidon hash of "zylith"
-        133815285368184
+        297878392397561531323157514055338665326964516349375370620567031486115348283
     } else if level == 1 {
-        0x4dc238068d891d7c8fcf1cd8f4e44ae3e2c9c82d0c7c4f4a72d6c1e1f7b
+        3512288313568464473430123398549864813878190791833821439566875248098264113824
     } else if level == 2 {
-        0x2c1a9f7f37f4c8b9c4e1b8f7c5d3a9e2f6b7c8d9e0f1a2b3c4d5e6f7a8b
+        2226399828310042547025502182856342619856289368590277596021551607660163312009
     } else if level == 3 {
-        0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0
+        905599745540687661875639291910401977748354141354090986604933229459406018662
     } else if level == 4 {
-        0x7f8e9d0c1b2a3f4e5d6c7b8a9f0e1d2c3b4a5f6e7d8c9b0a1f2e3d4c5b6
+        1331494656479495675629843380459434910975829908496242564122007472935530882837
     } else if level == 5 {
-        0x3d4c5b6a7f8e9d0c1b2a3f4e5d6c7b8a9f0e1d2c3b4a5f6e7d8c9b0a1f2
+        383408553629153325756714596935282276184744537328238656380875636978495766639
     } else if level == 6 {
-        0x5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4
+        287639463975670844702838146857925829605394072868779367267864950867646007386
     } else if level == 7 {
-        0x6f7e8d9c0b1a2f3e4d5c6b7a8f9e0d1c2b3a4f5e6d7c8b9a0f1e2d3c4b5
+        2134938431843311713859962912258022701497364828844005554097336824763920873155
     } else if level == 8 {
-        0xa1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9
+        3162174301111649376329924521798765580556642550281878124006540024234020491379
     } else if level == 9 {
-        0x8f9e0d1c2b3a4f5e6d7c8b9a0f1e2d3c4b5a6f7e8d9c0b1a2f3e4d5c6b7
+        1306841445268475488516997097079695960671052671032173836107686781971969828159
     } else if level == 10 {
-        0x2e3d4c5b6a7f8e9d0c1b2a3f4e5d6c7b8a9f0e1d2c3b4a5f6e7d8c9b0a1
+        158419431156437591443576247694098626122649154998042606964711629791023537634
     } else if level == 11 {
-        0x4b5a6f7e8d9c0b1a2f3e4d5c6b7a8f9e0d1c2b3a4f5e6d7c8b9a0f1e2d3
+        2314647922971296399760648388134600268487322555755038345629197314736135585819
     } else if level == 12 {
-        0x7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6
+        1474873748132138574208020738955470347011879797547241174684183554103504497314
     } else if level == 13 {
-        0x9d0c1b2a3f4e5d6c7b8a9f0e1d2c3b4a5f6e7d8c9b0a1f2e3d4c5b6a7f8
+        2947696221425311512246196719220699861457441483100273685163813928063266642416
     } else if level == 14 {
-        0x1f2e3d4c5b6a7f8e9d0c1b2a3f4e5d6c7b8a9f0e1d2c3b4a5f6e7d8c9b0
+        1707469952005801523734039187478545083284251578212905469004558254335564098936
     } else if level == 15 {
-        0x3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2
+        1990100374430916830350861753414614861876321351213918748074475145548486435584
     } else if level == 16 {
-        0x5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4
+        1142754151820279709283449124025596639156811981256255654396652155250162632188
     } else if level == 17 {
-        0x7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6
+        3257962958519477661242782713031299639568338926522404463209707000270729863315
     } else if level == 18 {
-        0x9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8
+        3004463342133493790990820424363815158480513356647162176019668083288463038282
     } else if level == 19 {
-        0x1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0
+        222519360520853879052479655010468092669588245194428047127117822218137278682
     } else if level == 20 {
-        0x3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2
+        3351928550297575556699653391767024314629277312693253881898903895603075591419
     } else {
         panic!("Invalid tree level")
     }
@@ -197,9 +196,33 @@ pub trait MerkleTreeTrait<TContractState> {
 
 #[cfg(test)]
 mod tests {
+    use core::hash::HashStateTrait;
+    use core::poseidon::PoseidonTrait;
     use super::{
         TREE_HEIGHT, compute_empty_tree_root, get_zero_value, hash_left_right, verify_proof,
     };
+
+    #[test]
+    fn test_zero_value_chain_consistency() {
+        // Verify the precomputed zero values match the Poseidon hash chain
+        // Level 0: Poseidon('zylith_empty')
+        // Level N: hash_left_right(zero[N-1], zero[N-1])
+        let seed: felt252 = 'zylith_empty';
+        let level_0 = PoseidonTrait::new().update(seed).finalize();
+        assert(get_zero_value(0) == level_0, 'Level 0 mismatch');
+
+        let mut prev = level_0;
+        let mut level: u32 = 1;
+        loop {
+            if level > TREE_HEIGHT {
+                break;
+            }
+            let expected = hash_left_right(prev, prev);
+            assert(get_zero_value(level) == expected, 'Zero chain mismatch');
+            prev = expected;
+            level += 1;
+        };
+    }
 
     #[test]
     fn test_hash_left_right() {

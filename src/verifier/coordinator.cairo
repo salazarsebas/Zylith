@@ -1,13 +1,7 @@
 /// Zylith Verifier Coordinator Contract
 ///
 /// Central contract managing all proof verifications and state updates.
-///
-/// ## Responsibilities
-/// 1. Route proofs to appropriate circuit verifiers
-/// 2. Manage nullifier spent set (double-spend prevention)
-/// 3. Update Merkle tree with new commitments
-/// 4. Validate roots against known history
-/// 5. Emit events for off-chain indexing
+/// Routes proofs to Garaga-generated verifier contracts and processes results.
 ///
 /// ## Architecture
 /// ```
@@ -16,43 +10,38 @@
 ///     +------+------+-----+-----+
 ///     |      |      |           |
 ///   Memb.  Swap   Mint        Burn
-///   Verif. Verif. Verif.     Verif.
+///   (Garaga verifier contracts)
 /// ```
 ///
-/// ## State
-/// - Nullifiers: LegacyMap<felt252, bool>
-/// - Merkle Tree: filled_subtrees, roots (circular buffer), next_index
-/// - Verifier addresses: 4 contract addresses
-///
-/// ## Security
-/// - Nullifiers marked AFTER successful verification
-/// - Atomic state updates
-/// - Admin-controlled pause functionality
+/// ## Verification Flow
+/// 1. User generates `full_proof_with_hints` via `garaga calldata`
+/// 2. Coordinator dispatches to appropriate Garaga verifier
+/// 3. Garaga verifier returns `Ok(public_inputs)` as `Span<u256>`
+/// 4. Coordinator extracts and validates public inputs
+/// 5. Coordinator updates state (nullifiers, Merkle tree, events)
 
 use super::types::{
-    Groth16Proof, MembershipPublicInputs, SwapPublicInputs, MintPublicInputs, BurnPublicInputs,
-    Errors,
-    membership_inputs_to_array, swap_inputs_to_array, mint_inputs_to_array, burn_inputs_to_array,
-    is_valid,
+    Errors, extract_burn_inputs, extract_membership_inputs, extract_mint_inputs,
+    extract_swap_inputs,
 };
 
 #[starknet::contract]
 pub mod VerifierCoordinator {
-    use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
     use starknet::storage::{
-        StoragePointerReadAccess, StoragePointerWriteAccess,
-        StorageMapReadAccess, StorageMapWriteAccess, Map,
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
+    };
+    use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
+    use crate::interfaces::coordinator::IVerifierCoordinator;
+    use crate::interfaces::verifier::{
+        IGroth16VerifierBN254Dispatcher, IGroth16VerifierBN254DispatcherTrait,
+    };
+    use crate::privacy::merkle::{
+        MAX_LEAVES, ROOT_HISTORY_SIZE, TREE_HEIGHT, get_zero_value, hash_left_right,
     };
     use super::{
-        Groth16Proof, MembershipPublicInputs, SwapPublicInputs, MintPublicInputs, BurnPublicInputs,
-        Errors,
-        membership_inputs_to_array, swap_inputs_to_array, mint_inputs_to_array, burn_inputs_to_array,
-        is_valid,
-    };
-    use crate::interfaces::coordinator::IVerifierCoordinator;
-    use crate::interfaces::verifier::{IVerifierDispatcher, IVerifierDispatcherTrait};
-    use crate::privacy::merkle::{
-        TREE_HEIGHT, ROOT_HISTORY_SIZE, MAX_LEAVES, hash_left_right, get_zero_value,
+        Errors, extract_burn_inputs, extract_membership_inputs, extract_mint_inputs,
+        extract_swap_inputs,
     };
 
     // ========================================================================
@@ -61,7 +50,7 @@ pub mod VerifierCoordinator {
 
     #[storage]
     struct Storage {
-        // Verifier contract addresses
+        // Garaga verifier contract addresses
         membership_verifier: ContractAddress,
         swap_verifier: ContractAddress,
         mint_verifier: ContractAddress,
@@ -69,8 +58,8 @@ pub mod VerifierCoordinator {
         // Nullifier tracking: nullifier_hash => is_spent
         nullifiers: Map<felt252, bool>,
         // Merkle tree state
-        filled_subtrees: Map<u32, felt252>, // level => rightmost filled node
-        roots: Map<u32, felt252>, // circular buffer of roots
+        filled_subtrees: Map<u32, felt252>,
+        roots: Map<u32, felt252>,
         current_root_index: u32,
         next_leaf_index: u32,
         // Admin and state
@@ -174,18 +163,15 @@ pub mod VerifierCoordinator {
         mint_verifier: ContractAddress,
         burn_verifier: ContractAddress,
     ) {
-        // Store admin and verifier addresses
         self.admin.write(admin);
         self.membership_verifier.write(membership_verifier);
         self.swap_verifier.write(swap_verifier);
         self.mint_verifier.write(mint_verifier);
         self.burn_verifier.write(burn_verifier);
 
-        // Initialize state
         self.paused.write(false);
         self.initialized.write(true);
 
-        // Initialize Merkle tree
         self._initialize_tree();
     }
 
@@ -196,170 +182,167 @@ pub mod VerifierCoordinator {
     #[abi(embed_v0)]
     impl CoordinatorImpl of IVerifierCoordinator<ContractState> {
         fn verify_membership(
-            ref self: ContractState, proof: Groth16Proof, public_inputs: MembershipPublicInputs,
+            ref self: ContractState, full_proof_with_hints: Span<felt252>,
         ) -> bool {
-            // Pre-checks
             self._assert_not_paused();
-            self._assert_known_root(public_inputs.root);
-            self._assert_nullifier_not_spent(public_inputs.nullifier_hash);
 
-            // Convert inputs to array and call verifier
-            let inputs_array = membership_inputs_to_array(public_inputs);
-            let verifier = IVerifierDispatcher {
+            // Call Garaga verifier
+            let verifier = IGroth16VerifierBN254Dispatcher {
                 contract_address: self.membership_verifier.read(),
             };
+            let result = verifier.verify_groth16_proof_bn254(full_proof_with_hints);
 
-            let result = verifier.verify_proof(proof, inputs_array.span());
+            // Extract public inputs from verified proof
+            let public_inputs_raw = match result {
+                Result::Ok(inputs) => inputs,
+                Result::Err(_) => { return false; },
+            };
+            let pi = extract_membership_inputs(public_inputs_raw);
 
-            if !is_valid(result) {
-                return false;
-            }
+            // Validate state
+            self._assert_known_root(pi.root);
+            self._assert_nullifier_not_spent(pi.nullifier_hash);
 
-            // Mark nullifier as spent
-            self._mark_nullifier_spent(public_inputs.nullifier_hash);
+            // Update state
+            self._mark_nullifier_spent(pi.nullifier_hash);
 
             // Emit events
-            self.emit(MembershipVerified {
-                nullifier_hash: public_inputs.nullifier_hash,
-                root: public_inputs.root,
-                timestamp: get_block_timestamp(),
-            });
+            self
+                .emit(
+                    MembershipVerified {
+                        nullifier_hash: pi.nullifier_hash,
+                        root: pi.root,
+                        timestamp: get_block_timestamp(),
+                    },
+                );
 
             true
         }
 
-        fn verify_swap(
-            ref self: ContractState,
-            proof: Groth16Proof,
-            public_inputs: SwapPublicInputs,
-            change_commitment: felt252,
-        ) -> bool {
-            // Pre-checks
+        fn verify_swap(ref self: ContractState, full_proof_with_hints: Span<felt252>) -> bool {
             self._assert_not_paused();
-            self._assert_known_root(public_inputs.root);
-            self._assert_nullifier_not_spent(public_inputs.nullifier_hash);
 
-            // Call verifier
-            let inputs_array = swap_inputs_to_array(public_inputs);
-            let verifier = IVerifierDispatcher {
+            // Call Garaga verifier
+            let verifier = IGroth16VerifierBN254Dispatcher {
                 contract_address: self.swap_verifier.read(),
             };
+            let result = verifier.verify_groth16_proof_bn254(full_proof_with_hints);
 
-            let result = verifier.verify_proof(proof, inputs_array.span());
+            // Extract public inputs from verified proof
+            let public_inputs_raw = match result {
+                Result::Ok(inputs) => inputs,
+                Result::Err(_) => { return false; },
+            };
+            let pi = extract_swap_inputs(public_inputs_raw);
 
-            if !is_valid(result) {
-                return false;
-            }
+            // Validate state
+            self._assert_known_root(pi.root);
+            self._assert_nullifier_not_spent(pi.nullifier_hash);
 
-            // Mark nullifier as spent
-            self._mark_nullifier_spent(public_inputs.nullifier_hash);
-
-            // Insert new commitments to Merkle tree
-            self._insert_commitment(public_inputs.new_commitment);
-            self._insert_commitment(change_commitment);
+            // Update state
+            self._mark_nullifier_spent(pi.nullifier_hash);
+            self._insert_commitment(pi.new_commitment);
+            self._insert_commitment(pi.change_commitment);
 
             // Emit events
-            self.emit(SwapVerified {
-                nullifier_hash: public_inputs.nullifier_hash,
-                new_commitment: public_inputs.new_commitment,
-                change_commitment,
-                token_in: public_inputs.token_in,
-                token_out: public_inputs.token_out,
-                timestamp: get_block_timestamp(),
-            });
+            self
+                .emit(
+                    SwapVerified {
+                        nullifier_hash: pi.nullifier_hash,
+                        new_commitment: pi.new_commitment,
+                        change_commitment: pi.change_commitment,
+                        token_in: pi.token_in,
+                        token_out: pi.token_out,
+                        timestamp: get_block_timestamp(),
+                    },
+                );
 
             true
         }
 
-        fn verify_mint(
-            ref self: ContractState,
-            proof: Groth16Proof,
-            public_inputs: MintPublicInputs,
-            change_commitment0: felt252,
-            change_commitment1: felt252,
-        ) -> bool {
-            // Pre-checks
+        fn verify_mint(ref self: ContractState, full_proof_with_hints: Span<felt252>) -> bool {
             self._assert_not_paused();
-            self._assert_known_root(public_inputs.root);
-            self._assert_nullifier_not_spent(public_inputs.nullifier_hash0);
-            self._assert_nullifier_not_spent(public_inputs.nullifier_hash1);
 
-            // Verify tick range
-            assert(public_inputs.tick_lower < public_inputs.tick_upper, Errors::INVALID_TICK_RANGE);
-
-            // Call verifier
-            let inputs_array = mint_inputs_to_array(public_inputs);
-            let verifier = IVerifierDispatcher {
+            // Call Garaga verifier
+            let verifier = IGroth16VerifierBN254Dispatcher {
                 contract_address: self.mint_verifier.read(),
             };
+            let result = verifier.verify_groth16_proof_bn254(full_proof_with_hints);
 
-            let result = verifier.verify_proof(proof, inputs_array.span());
+            // Extract public inputs from verified proof
+            let public_inputs_raw = match result {
+                Result::Ok(inputs) => inputs,
+                Result::Err(_) => { return false; },
+            };
+            let pi = extract_mint_inputs(public_inputs_raw);
 
-            if !is_valid(result) {
-                return false;
-            }
+            // Validate state
+            self._assert_known_root(pi.root);
+            self._assert_nullifier_not_spent(pi.nullifier_hash0);
+            self._assert_nullifier_not_spent(pi.nullifier_hash1);
+            assert(pi.tick_lower < pi.tick_upper, Errors::INVALID_TICK_RANGE);
 
-            // Mark nullifiers as spent
-            self._mark_nullifier_spent(public_inputs.nullifier_hash0);
-            self._mark_nullifier_spent(public_inputs.nullifier_hash1);
-
-            // Insert commitments to Merkle tree
-            self._insert_commitment(public_inputs.position_commitment);
-            self._insert_commitment(change_commitment0);
-            self._insert_commitment(change_commitment1);
+            // Update state
+            self._mark_nullifier_spent(pi.nullifier_hash0);
+            self._mark_nullifier_spent(pi.nullifier_hash1);
+            self._insert_commitment(pi.position_commitment);
+            self._insert_commitment(pi.change_commitment0);
+            self._insert_commitment(pi.change_commitment1);
 
             // Emit events
-            self.emit(MintVerified {
-                nullifier_hash0: public_inputs.nullifier_hash0,
-                nullifier_hash1: public_inputs.nullifier_hash1,
-                position_commitment: public_inputs.position_commitment,
-                tick_lower: public_inputs.tick_lower,
-                tick_upper: public_inputs.tick_upper,
-                timestamp: get_block_timestamp(),
-            });
+            self
+                .emit(
+                    MintVerified {
+                        nullifier_hash0: pi.nullifier_hash0,
+                        nullifier_hash1: pi.nullifier_hash1,
+                        position_commitment: pi.position_commitment,
+                        tick_lower: pi.tick_lower,
+                        tick_upper: pi.tick_upper,
+                        timestamp: get_block_timestamp(),
+                    },
+                );
 
             true
         }
 
-        fn verify_burn(
-            ref self: ContractState, proof: Groth16Proof, public_inputs: BurnPublicInputs,
-        ) -> bool {
-            // Pre-checks
+        fn verify_burn(ref self: ContractState, full_proof_with_hints: Span<felt252>) -> bool {
             self._assert_not_paused();
-            self._assert_known_root(public_inputs.root);
-            self._assert_nullifier_not_spent(public_inputs.position_nullifier_hash);
 
-            // Verify tick range
-            assert(public_inputs.tick_lower < public_inputs.tick_upper, Errors::INVALID_TICK_RANGE);
-
-            // Call verifier
-            let inputs_array = burn_inputs_to_array(public_inputs);
-            let verifier = IVerifierDispatcher {
+            // Call Garaga verifier
+            let verifier = IGroth16VerifierBN254Dispatcher {
                 contract_address: self.burn_verifier.read(),
             };
+            let result = verifier.verify_groth16_proof_bn254(full_proof_with_hints);
 
-            let result = verifier.verify_proof(proof, inputs_array.span());
+            // Extract public inputs from verified proof
+            let public_inputs_raw = match result {
+                Result::Ok(inputs) => inputs,
+                Result::Err(_) => { return false; },
+            };
+            let pi = extract_burn_inputs(public_inputs_raw);
 
-            if !is_valid(result) {
-                return false;
-            }
+            // Validate state
+            self._assert_known_root(pi.root);
+            self._assert_nullifier_not_spent(pi.position_nullifier_hash);
+            assert(pi.tick_lower < pi.tick_upper, Errors::INVALID_TICK_RANGE);
 
-            // Mark position nullifier as spent
-            self._mark_nullifier_spent(public_inputs.position_nullifier_hash);
-
-            // Insert output commitments to Merkle tree
-            self._insert_commitment(public_inputs.new_commitment0);
-            self._insert_commitment(public_inputs.new_commitment1);
+            // Update state
+            self._mark_nullifier_spent(pi.position_nullifier_hash);
+            self._insert_commitment(pi.new_commitment0);
+            self._insert_commitment(pi.new_commitment1);
 
             // Emit events
-            self.emit(BurnVerified {
-                position_nullifier_hash: public_inputs.position_nullifier_hash,
-                new_commitment0: public_inputs.new_commitment0,
-                new_commitment1: public_inputs.new_commitment1,
-                tick_lower: public_inputs.tick_lower,
-                tick_upper: public_inputs.tick_upper,
-                timestamp: get_block_timestamp(),
-            });
+            self
+                .emit(
+                    BurnVerified {
+                        position_nullifier_hash: pi.position_nullifier_hash,
+                        new_commitment0: pi.new_commitment0,
+                        new_commitment1: pi.new_commitment1,
+                        tick_lower: pi.tick_lower,
+                        tick_upper: pi.tick_upper,
+                        timestamp: get_block_timestamp(),
+                    },
+                );
 
             true
         }
@@ -418,7 +401,6 @@ pub mod VerifierCoordinator {
     impl InternalImpl of InternalTrait {
         /// Initialize Merkle tree with zero values
         fn _initialize_tree(ref self: ContractState) {
-            // Initialize filled_subtrees with zero values
             let mut level: u32 = 0;
             loop {
                 if level > TREE_HEIGHT {
@@ -426,9 +408,8 @@ pub mod VerifierCoordinator {
                 }
                 self.filled_subtrees.write(level, get_zero_value(level));
                 level += 1;
-            };
+            }
 
-            // Set initial root (empty tree root)
             let empty_root = get_zero_value(TREE_HEIGHT);
             self.roots.write(0, empty_root);
             self.current_root_index.write(0);
@@ -443,14 +424,12 @@ pub mod VerifierCoordinator {
 
             let current_index = self.current_root_index.read();
 
-            // Check last ROOT_HISTORY_SIZE roots
             let mut i: u32 = 0;
             loop {
                 if i >= ROOT_HISTORY_SIZE {
                     break;
                 }
 
-                // Calculate index in circular buffer
                 let check_index = if current_index >= i {
                     current_index - i
                 } else {
@@ -462,13 +441,12 @@ pub mod VerifierCoordinator {
                     return true;
                 }
 
-                // Stop if we've checked all inserted roots
                 if stored_root == 0 {
                     break;
                 }
 
                 i += 1;
-            };
+            }
 
             false
         }
@@ -482,54 +460,31 @@ pub mod VerifierCoordinator {
             let mut current_index = leaf_index;
             let mut level: u32 = 0;
 
-            // Compute path to root
             loop {
                 if level >= TREE_HEIGHT {
                     break;
                 }
 
-                // Get sibling
-                let sibling = if current_index % 2 == 0 {
-                    // We're a left child, sibling is zero value
-                    get_zero_value(level)
-                } else {
-                    // We're a right child, sibling is the filled subtree
-                    self.filled_subtrees.read(level)
-                };
-
-                // Determine left/right ordering
                 let (left, right) = if current_index % 2 == 0 {
-                    (current_hash, sibling)
+                    self.filled_subtrees.write(level, current_hash);
+                    (current_hash, get_zero_value(level))
                 } else {
-                    (sibling, current_hash)
+                    (self.filled_subtrees.read(level), current_hash)
                 };
 
-                // Hash to get parent
                 current_hash = hash_left_right(left, right);
-
-                // Update filled_subtrees if we're a left child
-                if current_index % 2 == 0 {
-                    self.filled_subtrees.write(level, current_hash);
-                }
 
                 current_index = current_index / 2;
                 level += 1;
-            };
+            }
 
-            // Update root (circular buffer)
             let new_root_index = (self.current_root_index.read() + 1) % ROOT_HISTORY_SIZE;
             self.roots.write(new_root_index, current_hash);
             self.current_root_index.write(new_root_index);
 
-            // Increment leaf index
             self.next_leaf_index.write(leaf_index + 1);
 
-            // Emit event
-            self.emit(CommitmentAdded {
-                commitment,
-                leaf_index,
-                new_root: current_hash,
-            });
+            self.emit(CommitmentAdded { commitment, leaf_index, new_root: current_hash });
         }
 
         /// Mark nullifier as spent

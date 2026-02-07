@@ -245,8 +245,8 @@ pub fn update_position_fees(
 mod tests {
     use starknet::ContractAddress;
     use super::{
-        create_note, create_shielded_position, is_valid_note, is_valid_position,
-        note_to_commitment, note_to_nullifier_hash, update_position_fees, update_position_liquidity,
+        create_note, create_shielded_position, is_valid_note, is_valid_position, note_to_commitment,
+        note_to_nullifier_hash, update_position_fees, update_position_liquidity,
     };
 
     #[test]

@@ -13,8 +13,8 @@
 pub mod clmm;
 pub mod interfaces;
 pub mod privacy;
-pub mod verifier;
 pub mod types;
+pub mod verifier;
 
 // Re-export fee tier
 pub use clmm::fees::FeeTier;
@@ -23,15 +23,12 @@ pub use clmm::fees::FeeTier;
 pub use clmm::pool::{PoolKey, PoolState, TickInfo};
 pub use clmm::positions::{Position, PositionKey};
 pub use clmm::swap::{SwapResult, SwapState};
+pub use interfaces::coordinator::IVerifierCoordinator;
 
 // Re-export interfaces
 pub use interfaces::erc20::IERC20;
 pub use interfaces::pool::IZylithPool;
-pub use interfaces::verifier::IVerifier;
-pub use interfaces::coordinator::IVerifierCoordinator;
+pub use interfaces::verifier::IGroth16VerifierBN254;
 
 // Re-export verifier types
-pub use verifier::{
-    G1Point, G2Point, Groth16Proof, VerificationResult,
-    MembershipPublicInputs, SwapPublicInputs, MintPublicInputs, BurnPublicInputs,
-};
+pub use verifier::{BurnPublicInputs, MembershipPublicInputs, MintPublicInputs, SwapPublicInputs};

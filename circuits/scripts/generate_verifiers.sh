@@ -37,7 +37,6 @@ for i in "${!CIRCUITS[@]}"; do
   echo "[$idx/4] Generating Garaga verifier for $circuit..."
 
   VK_FILE="$BUILD_DIR/$circuit/verification_key.json"
-  OUTPUT_FILE="$GARAGA_OUT/${circuit}_groth16_verifier.cairo"
 
   # Check if verification key exists
   if [ ! -f "$VK_FILE" ]; then
@@ -46,14 +45,15 @@ for i in "${!CIRCUITS[@]}"; do
     exit 1
   fi
 
-  # Generate Garaga verifier
+  # Generate Garaga verifier (creates a full Scarb project)
+  cd "$GARAGA_OUT"
   garaga gen \
     --system groth16 \
     --vk "$VK_FILE" \
-    --output "$OUTPUT_FILE" \
-    --curve bn254
+    --project-name "${circuit}_verifier"
+  cd "$PROJECT_ROOT"
 
-  echo "      Done. Output: $OUTPUT_FILE"
+  echo "      Done. Output: $GARAGA_OUT/${circuit}_verifier/"
   echo ""
 done
 
@@ -61,17 +61,13 @@ echo "==================================================="
 echo "  Garaga verifier generation complete!"
 echo "==================================================="
 echo ""
-echo "Generated Cairo verifiers:"
+echo "Generated Scarb projects:"
 for circuit in "${CIRCUITS[@]}"; do
-  echo "  - $GARAGA_OUT/${circuit}_groth16_verifier.cairo"
+  echo "  - $GARAGA_OUT/${circuit}_verifier/"
 done
 echo ""
 echo "Next steps:"
-echo "  1. Review generated verifiers in $GARAGA_OUT/"
-echo "  2. Extract verification key constants"
-echo "  3. Integrate with src/verifier/ contracts"
+echo "  1. Build each verifier: cd garaga_verifiers/<name> && scarb build"
+echo "  2. Deploy verifier contracts to Starknet"
+echo "  3. Pass verifier addresses to VerifierCoordinator constructor"
 echo ""
-echo "Integration guide:"
-echo "  - Copy constants from generated verifiers to src/verifier/*_verifier.cairo"
-echo "  - Use Garaga's verify functions in your contracts"
-echo "  - Update src/lib.cairo to export verifier modules"
