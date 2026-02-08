@@ -10,7 +10,14 @@
     "compile:all": "bun run compile:membership && bun run compile:swap && bun run compile:mint && bun run compile:burn",
     "setup": "bash scripts/setup.sh",
     "generate": "bash scripts/generate_verifiers.sh",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "prove:all": "node scripts/generate_proofs.mjs",
+    "prove:membership": "node scripts/generate_proofs.mjs --circuit membership",
+    "prove:swap": "node scripts/generate_proofs.mjs --circuit swap",
+    "prove:mint": "node scripts/generate_proofs.mjs --circuit mint",
+    "prove:burn": "node scripts/generate_proofs.mjs --circuit burn",
+    "prove:no-garaga": "node scripts/generate_proofs.mjs --skip-garaga",
+    "verify": "node scripts/generate_proofs.mjs --verify-only",
+    "test": "node scripts/generate_proofs.mjs --verify-only"
   },
   "keywords": [
     "circom",
@@ -23,9 +30,9 @@
   "license": "MIT",
   "dependencies": {
     "circomlib": "^2.0.5",
+    "circomlibjs": "^0.1.7",
     "snarkjs": "^0.7.0"
   },
   "devDependencies": {
-    "circom": "^2.2.0"
   }
 }
