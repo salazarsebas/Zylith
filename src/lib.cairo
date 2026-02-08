@@ -12,6 +12,7 @@
 
 pub mod clmm;
 pub mod interfaces;
+pub mod pool;
 pub mod privacy;
 pub mod types;
 pub mod verifier;

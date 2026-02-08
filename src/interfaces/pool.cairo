@@ -67,6 +67,38 @@ pub trait IZylithPool<TContractState> {
     fn collect_protocol_fees(
         ref self: TContractState, pool_key: PoolKey, recipient: ContractAddress,
     ) -> (u128, u128);
+
+    /// Execute a shielded swap via ZK proof
+    /// The coordinator verifies the proof and manages privacy state (nullifiers, commitments)
+    /// The pool updates CLMM state (price, liquidity, fees)
+    fn shielded_swap(
+        ref self: TContractState,
+        pool_key: PoolKey,
+        full_proof_with_hints: Span<felt252>,
+        zero_for_one: bool,
+        amount_specified: u256,
+        sqrt_price_limit: u256,
+    );
+
+    /// Execute a shielded mint (add liquidity) via ZK proof
+    fn shielded_mint(
+        ref self: TContractState,
+        pool_key: PoolKey,
+        full_proof_with_hints: Span<felt252>,
+        tick_lower: i32,
+        tick_upper: i32,
+        liquidity: u128,
+    );
+
+    /// Execute a shielded burn (remove liquidity) via ZK proof
+    fn shielded_burn(
+        ref self: TContractState,
+        pool_key: PoolKey,
+        full_proof_with_hints: Span<felt252>,
+        tick_lower: i32,
+        tick_upper: i32,
+        liquidity: u128,
+    );
 }
 
 /// Pool callback interface for flash accounting
