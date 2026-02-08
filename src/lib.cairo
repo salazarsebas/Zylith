@@ -17,6 +17,9 @@ pub mod privacy;
 pub mod types;
 pub mod verifier;
 
+#[cfg(test)]
+pub mod tests;
+
 // Re-export fee tier
 pub use clmm::fees::FeeTier;
 

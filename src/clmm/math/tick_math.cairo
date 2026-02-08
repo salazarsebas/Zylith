@@ -107,28 +107,8 @@ pub fn get_sqrt_price_at_tick(tick: i32) -> u256 {
         ratio = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff / ratio;
     }
 
-    // Convert from internal representation to Q128.128
-    // Round up if needed to ensure we don't undershoot the tick
-    if tick > 0 {
-        // For positive ticks, we took reciprocal, so round up
-        let sqrt_price = if (ratio % ONE) > 0 {
-            (ratio / ONE) + 1
-        } else {
-            ratio / ONE
-        };
-        sqrt_price
-    } else if tick == 0 {
-        // At tick 0, sqrt_price should be exactly ONE
-        ONE
-    } else {
-        // For negative ticks, use the ratio directly
-        let sqrt_price = if (ratio % ONE) > 0 {
-            (ratio / ONE) + 1
-        } else {
-            ratio / ONE
-        };
-        sqrt_price
-    }
+    // The ratio is already in Q128.128 format — return it directly
+    ratio
 }
 
 /// Get tick at a given sqrt price

@@ -2,7 +2,7 @@
 /// Calculates token amounts from liquidity and price ranges
 use core::integer::u512_safe_div_rem_by_u256;
 use core::num::traits::WideMul;
-use super::sqrt_price::{ONE, mul_div_ceil, mul_div_floor, mul_q128};
+use super::sqrt_price::{ONE, wide_mul_div, wide_mul_div_ceil};
 
 /// Errors
 pub mod Errors {
@@ -26,17 +26,24 @@ pub fn get_amount_0_delta(
     assert(sqrt_price_upper > sqrt_price_lower, Errors::INVALID_PRICE_RANGE);
     assert(sqrt_price_lower > 0, Errors::DIVISION_BY_ZERO);
 
-    let liquidity_u256: u256 = liquidity.into();
-    let numerator = liquidity_u256 * (sqrt_price_upper - sqrt_price_lower);
+    // amount0 = L * (p_upper - p_lower) * ONE / (p_lower * p_upper)
+    // Compute in two steps to avoid overflow (Uniswap V3 approach):
+    // Step 1: temp = L * ONE * delta / p_upper
+    // Step 2: amount = temp / p_lower
+    let numerator1: u256 = liquidity.into() * ONE;
+    let numerator2: u256 = sqrt_price_upper - sqrt_price_lower;
 
     if round_up {
-        // Round up: use ceiling division
-        let denominator = mul_q128(sqrt_price_lower, sqrt_price_upper);
-        mul_div_ceil(numerator, ONE, denominator)
+        let step1 = wide_mul_div_ceil(numerator1, numerator2, sqrt_price_upper);
+        // Ceiling division for step 2
+        if step1 % sqrt_price_lower != 0 {
+            (step1 / sqrt_price_lower) + 1
+        } else {
+            step1 / sqrt_price_lower
+        }
     } else {
-        // Round down: use floor division
-        let denominator = mul_q128(sqrt_price_lower, sqrt_price_upper);
-        mul_div_floor(numerator, ONE, denominator)
+        let step1 = wide_mul_div(numerator1, numerator2, sqrt_price_upper);
+        step1 / sqrt_price_lower
     }
 }
 

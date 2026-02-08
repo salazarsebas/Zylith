@@ -8,6 +8,12 @@ starknet = "2.9.1"
 
 [dev-dependencies]
 cairo_test = "2.15.1"
+snforge_std = "0.55.0"
+
+[profile.dev.cairo]
+unstable-add-statements-functions-debug-info = true
+unstable-add-statements-code-locations-debug-info = true
+panic-backtrace = true
 
 [[target.starknet-contract]]
 sierra = true

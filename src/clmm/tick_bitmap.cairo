@@ -10,9 +10,14 @@ pub mod Errors {
 /// Returns (word_pos, bit_pos) where word_pos is the u256 index and bit_pos is the bit within that
 /// u256
 pub fn position(tick: i32) -> (i32, u8) {
-    // Each word holds 256 bits
-    let word_pos = tick / 256; // Divide by 256
-    let bit_pos: u8 = (tick % 256).try_into().unwrap();
+    // Floor division for word_pos (Cairo uses truncated division, so adjust for negatives)
+    let word_pos = if tick < 0 && tick % 256 != 0 {
+        (tick / 256) - 1
+    } else {
+        tick / 256
+    };
+    // bit_pos = tick - word_pos * 256, always in range [0, 255]
+    let bit_pos: u8 = (tick - word_pos * 256).try_into().unwrap();
     (word_pos, bit_pos)
 }
 

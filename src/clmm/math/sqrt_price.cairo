@@ -6,11 +6,11 @@ use core::num::traits::WideMul;
 /// Q128.128 fixed point constant: ONE = 2^128
 pub const ONE: u256 = 0x100000000000000000000000000000000;
 
-/// Minimum sqrt price (tick = -887272)
-pub const MIN_SQRT_PRICE: u256 = 4295128739;
+/// Minimum sqrt price (tick = -887272) in Q128.128
+pub const MIN_SQRT_PRICE: u256 = 0x1000276A300000000;
 
-/// Maximum sqrt price (tick = 887272)
-pub const MAX_SQRT_PRICE: u256 = 1461446703485210103287273052203988822378723970342;
+/// Maximum sqrt price (tick = 887272) in Q128.128
+pub const MAX_SQRT_PRICE: u256 = 0xFFFD8963EFD1FC6A506488495D951D5263988D2600000000;
 
 /// Errors
 pub mod Errors {
@@ -60,6 +60,26 @@ pub fn mul_div_ceil(a: u256, b_q128: u256, divisor: u256) -> u256 {
     result
 }
 
+/// Wide multiply and divide: floor(a * b / c) using u512 arithmetic
+pub fn wide_mul_div(a: u256, b: u256, c: u256) -> u256 {
+    assert(c != 0, Errors::DIVISION_BY_ZERO);
+    let product = a.wide_mul(b);
+    let (quotient, _) = u512_safe_div_rem_by_u256(product, c.try_into().unwrap());
+    quotient.try_into().expect(Errors::OVERFLOW)
+}
+
+/// Wide multiply and divide with ceiling: ceil(a * b / c) using u512 arithmetic
+pub fn wide_mul_div_ceil(a: u256, b: u256, c: u256) -> u256 {
+    assert(c != 0, Errors::DIVISION_BY_ZERO);
+    let product = a.wide_mul(b);
+    let (quotient, remainder) = u512_safe_div_rem_by_u256(product, c.try_into().unwrap());
+    let mut result: u256 = quotient.try_into().expect(Errors::OVERFLOW);
+    if remainder != 0 {
+        result += 1;
+    }
+    result
+}
+
 /// Get the next sqrt price from input amount
 /// Moving left (token0 in) decreases sqrt_price
 /// Moving right (token1 in) increases sqrt_price
@@ -91,6 +111,7 @@ pub fn get_next_sqrt_price_from_output(
 }
 
 /// Calculate next sqrt price from amount0
+/// new_p = L * p * ONE / (L * ONE +/- amount * p) = numerator * sqrt_price / denominator
 /// Round up to favor the pool
 fn get_next_sqrt_price_from_amount_0_rounding_up(
     sqrt_price: u256, liquidity: u128, amount: u256, add: bool,
@@ -108,7 +129,7 @@ fn get_next_sqrt_price_from_amount_0_rounding_up(
         let denominator = numerator + product;
 
         if denominator >= numerator {
-            let result = mul_div_ceil(numerator, ONE, denominator);
+            let result = wide_mul_div_ceil(numerator, sqrt_price, denominator);
             assert(
                 result >= MIN_SQRT_PRICE && result <= MAX_SQRT_PRICE,
                 Errors::SQRT_PRICE_OUT_OF_BOUNDS,
@@ -116,8 +137,13 @@ fn get_next_sqrt_price_from_amount_0_rounding_up(
             return result;
         }
 
-        // If overflow, use alternative calculation
-        let result = div_q128(numerator, (numerator / sqrt_price) + amount);
+        // Overflow fallback: new_p = ceil(numerator / (numerator / p + amount))
+        let denom = (numerator / sqrt_price) + amount;
+        let result = if numerator % denom != 0 {
+            (numerator / denom) + 1
+        } else {
+            numerator / denom
+        };
         assert(
             result >= MIN_SQRT_PRICE && result <= MAX_SQRT_PRICE, Errors::SQRT_PRICE_OUT_OF_BOUNDS,
         );
@@ -128,7 +154,7 @@ fn get_next_sqrt_price_from_amount_0_rounding_up(
         assert(numerator > product, 'Amount exceeds liquidity');
 
         let denominator = numerator - product;
-        let result = mul_div_ceil(numerator, ONE, denominator);
+        let result = wide_mul_div_ceil(numerator, sqrt_price, denominator);
         assert(
             result >= MIN_SQRT_PRICE && result <= MAX_SQRT_PRICE, Errors::SQRT_PRICE_OUT_OF_BOUNDS,
         );
@@ -162,8 +188,9 @@ fn get_next_sqrt_price_from_amount_1_rounding_down(
         result
     } else {
         // Price decreases when removing token1
+        // quotient = ceil(amount * ONE / L) — Q128.128 representation of amount/L
         let quotient = if amount <= 0xffffffffffffffffffffffffffffffff {
-            mul_div_ceil(amount, ONE, liquidity_u256)
+            wide_mul_div_ceil(amount, ONE, liquidity_u256)
         } else {
             mul_q128(amount, div_q128(ONE, liquidity_u256))
         };

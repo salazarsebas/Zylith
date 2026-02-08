@@ -1,4 +1,4 @@
-use super::fees::{calculate_fee_amount, calculate_protocol_fee, update_fee_growth};
+use super::fees::{amount_after_fee, calculate_protocol_fee, update_fee_growth};
 use super::math::liquidity::{add_liquidity, get_amount_0_delta, get_amount_1_delta, sub_liquidity};
 use super::math::sqrt_price::{get_next_sqrt_price_from_input, get_next_sqrt_price_from_output};
 use super::math::tick_math::{MAX_TICK, MIN_TICK, align_tick_down, align_tick_up};
@@ -48,7 +48,9 @@ pub mod Errors {
     pub const ZERO_LIQUIDITY: felt252 = 'Zero liquidity';
 }
 
-/// Execute a single swap step
+/// Execute a single swap step (Uniswap V3 pattern)
+/// For exact input: fee is deducted FIRST, then the swap is computed with the fee-deducted amount.
+/// Returns (sqrt_price_next, amount_in, amount_out, fee_amount)
 pub fn compute_swap_step(
     sqrt_price_current: u256,
     sqrt_price_target: u256,
@@ -61,85 +63,72 @@ pub fn compute_swap_step(
 
     let exact_input = amount_remaining > 0;
 
-    // Determine if we can reach the target price
+    // Step 1: Determine if we can reach the target price
     let sqrt_price_next = if exact_input {
-        // For exact input, try to reach target with remaining amount
-        let sqrt_price_max = get_next_sqrt_price_from_input(
-            sqrt_price_current, liquidity, amount_remaining, zero_for_one,
-        );
+        // Deduct fee from remaining amount first
+        let amount_remaining_less_fee = amount_after_fee(amount_remaining, fee);
 
-        if zero_for_one {
-            if sqrt_price_max < sqrt_price_target {
-                sqrt_price_target
-            } else {
-                sqrt_price_max
-            }
+        // Check: can we reach the target with the fee-deducted amount?
+        let amount_in_to_target = if zero_for_one {
+            get_amount_0_delta(sqrt_price_target, sqrt_price_current, liquidity, true)
         } else {
-            if sqrt_price_max > sqrt_price_target {
-                sqrt_price_target
-            } else {
-                sqrt_price_max
-            }
+            get_amount_1_delta(sqrt_price_current, sqrt_price_target, liquidity, true)
+        };
+
+        if amount_remaining_less_fee >= amount_in_to_target {
+            sqrt_price_target
+        } else {
+            // Can't reach target — compute max price from available amount
+            get_next_sqrt_price_from_input(
+                sqrt_price_current, liquidity, amount_remaining_less_fee, zero_for_one,
+            )
         }
     } else {
         // For exact output, try to reach target with remaining amount
-        let sqrt_price_max = get_next_sqrt_price_from_output(
-            sqrt_price_current, liquidity, amount_remaining, zero_for_one,
-        );
-
-        if zero_for_one {
-            if sqrt_price_max < sqrt_price_target {
-                sqrt_price_target
-            } else {
-                sqrt_price_max
-            }
+        let amount_out_to_target = if zero_for_one {
+            get_amount_1_delta(sqrt_price_target, sqrt_price_current, liquidity, false)
         } else {
-            if sqrt_price_max > sqrt_price_target {
-                sqrt_price_target
-            } else {
-                sqrt_price_max
-            }
+            get_amount_0_delta(sqrt_price_current, sqrt_price_target, liquidity, false)
+        };
+
+        if amount_remaining >= amount_out_to_target {
+            sqrt_price_target
+        } else {
+            get_next_sqrt_price_from_output(
+                sqrt_price_current, liquidity, amount_remaining, zero_for_one,
+            )
         }
     };
 
     let reached_target = sqrt_price_next == sqrt_price_target;
 
-    // Calculate amounts
-    let (amount_in, amount_out) = if zero_for_one {
+    // Step 2: Calculate actual amounts from the price movement
+    let (amount_in, mut amount_out) = if zero_for_one {
         (
-            if reached_target && !exact_input {
-                get_amount_0_delta(sqrt_price_target, sqrt_price_current, liquidity, true)
-            } else {
-                get_amount_0_delta(sqrt_price_next, sqrt_price_current, liquidity, true)
-            },
-            if reached_target && exact_input {
-                get_amount_1_delta(sqrt_price_target, sqrt_price_current, liquidity, false)
-            } else {
-                get_amount_1_delta(sqrt_price_next, sqrt_price_current, liquidity, false)
-            },
+            get_amount_0_delta(sqrt_price_next, sqrt_price_current, liquidity, true),
+            get_amount_1_delta(sqrt_price_next, sqrt_price_current, liquidity, false),
         )
     } else {
         (
-            if reached_target && !exact_input {
-                get_amount_1_delta(sqrt_price_current, sqrt_price_target, liquidity, true)
-            } else {
-                get_amount_1_delta(sqrt_price_current, sqrt_price_next, liquidity, true)
-            },
-            if reached_target && exact_input {
-                get_amount_0_delta(sqrt_price_current, sqrt_price_target, liquidity, false)
-            } else {
-                get_amount_0_delta(sqrt_price_current, sqrt_price_next, liquidity, false)
-            },
+            get_amount_1_delta(sqrt_price_current, sqrt_price_next, liquidity, true),
+            get_amount_0_delta(sqrt_price_current, sqrt_price_next, liquidity, false),
         )
     };
 
-    // Calculate fee
-    // For exact input: fee is included in amount_in
-    // For exact output: fee is calculated separately on amount_in
-    let fee_amount = if exact_input {
-        calculate_fee_amount(amount_in, fee)
+    // Cap output for exact output mode
+    if !exact_input && amount_out > amount_remaining {
+        amount_out = amount_remaining;
+    }
+
+    // Step 3: Calculate fee
+    let fee_amount = if exact_input && !reached_target {
+        // Didn't reach target: fee is the remainder of the input
+        amount_remaining - amount_in
     } else {
-        calculate_fee_amount(amount_in, fee)
+        // Reached target or exact output: fee = ceil(amount_in * fee / (1e6 - fee))
+        let fee_u256: u256 = fee.into();
+        let fee_denom: u256 = 1000000 - fee_u256;
+        (amount_in * fee_u256 + fee_denom - 1) / fee_denom
     };
 
     (sqrt_price_next, amount_in, amount_out, fee_amount)
