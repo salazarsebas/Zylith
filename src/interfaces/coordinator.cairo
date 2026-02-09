@@ -29,6 +29,7 @@
 /// - Public inputs are extracted from the verified proof (not user-supplied)
 
 use starknet::ContractAddress;
+use crate::verifier::types::{SwapPublicInputs, MintPublicInputs, BurnPublicInputs};
 
 /// Coordinator interface for managing all proof verifications
 #[starknet::interface]
@@ -65,13 +66,18 @@ pub trait IVerifierCoordinator<TContractState> {
     /// * `full_proof_with_hints` - Garaga calldata blob for swap circuit
     ///
     /// # Returns
-    /// * `true` if verification succeeds
+    /// * Verified `SwapPublicInputs` extracted from the proof
     ///
     /// # Side Effects
     /// * Marks input nullifier_hash as spent
     /// * Inserts new_commitment and change_commitment to Merkle tree
     /// * Emits SwapVerified and CommitmentAdded events
-    fn verify_swap(ref self: TContractState, full_proof_with_hints: Span<felt252>) -> bool;
+    ///
+    /// # Panics
+    /// * If proof verification fails, root is unknown, or nullifier is spent
+    fn verify_swap(
+        ref self: TContractState, full_proof_with_hints: Span<felt252>,
+    ) -> SwapPublicInputs;
 
     /// Verify mint proof, register nullifiers, add commitments
     ///
@@ -81,13 +87,18 @@ pub trait IVerifierCoordinator<TContractState> {
     /// * `full_proof_with_hints` - Garaga calldata blob for mint circuit
     ///
     /// # Returns
-    /// * `true` if verification succeeds
+    /// * Verified `MintPublicInputs` extracted from the proof
     ///
     /// # Side Effects
     /// * Marks nullifier_hash0 and nullifier_hash1 as spent
     /// * Inserts position_commitment, change_commitment0, change_commitment1 to Merkle tree
     /// * Emits MintVerified and CommitmentAdded events
-    fn verify_mint(ref self: TContractState, full_proof_with_hints: Span<felt252>) -> bool;
+    ///
+    /// # Panics
+    /// * If proof verification fails, root is unknown, or nullifiers are spent
+    fn verify_mint(
+        ref self: TContractState, full_proof_with_hints: Span<felt252>,
+    ) -> MintPublicInputs;
 
     /// Verify burn proof, register nullifier, add output commitments
     ///
@@ -97,13 +108,18 @@ pub trait IVerifierCoordinator<TContractState> {
     /// * `full_proof_with_hints` - Garaga calldata blob for burn circuit
     ///
     /// # Returns
-    /// * `true` if verification succeeds
+    /// * Verified `BurnPublicInputs` extracted from the proof
     ///
     /// # Side Effects
     /// * Marks position_nullifier_hash as spent
     /// * Inserts new_commitment0 and new_commitment1 to Merkle tree
     /// * Emits BurnVerified and CommitmentAdded events
-    fn verify_burn(ref self: TContractState, full_proof_with_hints: Span<felt252>) -> bool;
+    ///
+    /// # Panics
+    /// * If proof verification fails, root is unknown, or nullifier is spent
+    fn verify_burn(
+        ref self: TContractState, full_proof_with_hints: Span<felt252>,
+    ) -> BurnPublicInputs;
 
     // ========================================================================
     // State Query Functions

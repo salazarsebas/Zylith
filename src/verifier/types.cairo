@@ -156,10 +156,19 @@ pub mod PublicInputCounts {
 }
 
 /// Tick offset constant for converting signed ticks to unsigned
+/// Circom circuits use unsigned ticks: offset_tick = signed_tick + TICK_OFFSET
 pub const TICK_OFFSET: u32 = 887272;
 
 /// Maximum valid tick after offset (2 * TICK_OFFSET)
 pub const MAX_TICK_OFFSET: u32 = 1774544;
+
+/// Convert unsigned tick from proof (u32 with TICK_OFFSET) to signed i32 for CLMM
+/// offset_tick = signed_tick + TICK_OFFSET => signed_tick = offset_tick - TICK_OFFSET
+pub fn offset_tick_to_signed(offset_tick: u32) -> i32 {
+    let offset_i32: i32 = TICK_OFFSET.try_into().unwrap();
+    let tick_i32: i32 = offset_tick.try_into().unwrap();
+    tick_i32 - offset_i32
+}
 
 // ============================================================================
 // Error Codes

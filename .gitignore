@@ -15,10 +15,21 @@ Scarb.lock
 .DS_Store
 Thumbs.db
 
-# Environment files
-.env
-.env.local
-.env.*.local
+# Environment files — catch all .env variants
+.env*
+!.env.example
+
+# Starknet account & deployment secrets
+scripts/starknet-account/
+account.json
+keystore.json
+*.keystore
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Garaga generated files
 *.json.gz

@@ -1,0 +1,13 @@
+{
+  "network": "starknet-sepolia",
+  "admin": "0x002e8d5603aeae2945f86e798acc2aabba1e7d9abb88e4edaea08ef820085235",
+  "protocol_fee": 1,
+  "verifiers": {
+    "membership": "0x0759ff02a8924e978d73baf66681ee22b3b4a0d496928c23a13a2caa37457000",
+    "swap": "0x00100933e33295fb406f63d7d27969e9446f043e63e99ba9484298781d073dfa",
+    "mint": "0x07f8779dafbc6204dc0a0f365ea119a711adbbe7ce04bfbd49b2f693a58013ca",
+    "burn": "0x0078c67f5e68c3064f04a5b8cc601a0ac403d058d58ed5e9df951f552560b1b0"
+  },
+  "coordinator": "0x00c44f51a5ab607dbbb2a5813361d4518f5a2abb40c3d57099541af2d7661175",
+  "pool": "0x02392c420d8694698dfcdddd072bda63903a7145ce4e417efbfa29f55e4d9844"
+}

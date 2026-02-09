@@ -15,6 +15,9 @@ unstable-add-statements-functions-debug-info = true
 unstable-add-statements-code-locations-debug-info = true
 panic-backtrace = true
 
+[profile.release.cairo]
+# No debug metadata → smaller Sierra files for deployment
+
 [[target.starknet-contract]]
 sierra = true
 casm = true

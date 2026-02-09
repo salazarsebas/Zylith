@@ -21,8 +21,8 @@
 /// 5. Coordinator updates state (nullifiers, Merkle tree, events)
 
 use super::types::{
-    Errors, extract_burn_inputs, extract_membership_inputs, extract_mint_inputs,
-    extract_swap_inputs,
+    BurnPublicInputs, Errors, MintPublicInputs, SwapPublicInputs, extract_burn_inputs,
+    extract_membership_inputs, extract_mint_inputs, extract_swap_inputs,
 };
 
 #[starknet::contract]
@@ -40,8 +40,8 @@ pub mod VerifierCoordinator {
         MAX_LEAVES, ROOT_HISTORY_SIZE, TREE_HEIGHT, get_zero_value, hash_left_right,
     };
     use super::{
-        Errors, extract_burn_inputs, extract_membership_inputs, extract_mint_inputs,
-        extract_swap_inputs,
+        BurnPublicInputs, Errors, MintPublicInputs, SwapPublicInputs, extract_burn_inputs,
+        extract_membership_inputs, extract_mint_inputs, extract_swap_inputs,
     };
 
     // ========================================================================
@@ -219,7 +219,9 @@ pub mod VerifierCoordinator {
             true
         }
 
-        fn verify_swap(ref self: ContractState, full_proof_with_hints: Span<felt252>) -> bool {
+        fn verify_swap(
+            ref self: ContractState, full_proof_with_hints: Span<felt252>,
+        ) -> SwapPublicInputs {
             self._assert_not_paused();
 
             // Call Garaga verifier
@@ -229,10 +231,7 @@ pub mod VerifierCoordinator {
             let result = verifier.verify_groth16_proof_bn254(full_proof_with_hints);
 
             // Extract public inputs from verified proof
-            let public_inputs_raw = match result {
-                Result::Ok(inputs) => inputs,
-                Result::Err(_) => { return false; },
-            };
+            let public_inputs_raw = result.expect(Errors::INVALID_PROOF);
             let pi = extract_swap_inputs(public_inputs_raw);
 
             // Validate state
@@ -257,10 +256,12 @@ pub mod VerifierCoordinator {
                     },
                 );
 
-            true
+            pi
         }
 
-        fn verify_mint(ref self: ContractState, full_proof_with_hints: Span<felt252>) -> bool {
+        fn verify_mint(
+            ref self: ContractState, full_proof_with_hints: Span<felt252>,
+        ) -> MintPublicInputs {
             self._assert_not_paused();
 
             // Call Garaga verifier
@@ -270,10 +271,7 @@ pub mod VerifierCoordinator {
             let result = verifier.verify_groth16_proof_bn254(full_proof_with_hints);
 
             // Extract public inputs from verified proof
-            let public_inputs_raw = match result {
-                Result::Ok(inputs) => inputs,
-                Result::Err(_) => { return false; },
-            };
+            let public_inputs_raw = result.expect(Errors::INVALID_PROOF);
             let pi = extract_mint_inputs(public_inputs_raw);
 
             // Validate state
@@ -302,10 +300,12 @@ pub mod VerifierCoordinator {
                     },
                 );
 
-            true
+            pi
         }
 
-        fn verify_burn(ref self: ContractState, full_proof_with_hints: Span<felt252>) -> bool {
+        fn verify_burn(
+            ref self: ContractState, full_proof_with_hints: Span<felt252>,
+        ) -> BurnPublicInputs {
             self._assert_not_paused();
 
             // Call Garaga verifier
@@ -315,10 +315,7 @@ pub mod VerifierCoordinator {
             let result = verifier.verify_groth16_proof_bn254(full_proof_with_hints);
 
             // Extract public inputs from verified proof
-            let public_inputs_raw = match result {
-                Result::Ok(inputs) => inputs,
-                Result::Err(_) => { return false; },
-            };
+            let public_inputs_raw = result.expect(Errors::INVALID_PROOF);
             let pi = extract_burn_inputs(public_inputs_raw);
 
             // Validate state
@@ -344,7 +341,7 @@ pub mod VerifierCoordinator {
                     },
                 );
 
-            true
+            pi
         }
 
         // ====================================================================

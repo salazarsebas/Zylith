@@ -7,6 +7,19 @@ use starknet::ContractAddress;
 use snforge_std::{declare, ContractClassTrait, DeclareResultTrait};
 use snforge_std::{start_cheat_caller_address, stop_cheat_caller_address};
 
+/// ABI for mock coordinator setter functions
+#[starknet::interface]
+trait IMockCoordinatorSetters<TContractState> {
+    fn set_mock_swap_params(
+        ref self: TContractState,
+        token_in: ContractAddress,
+        token_out: ContractAddress,
+        amount_in: u256,
+        amount_out_min: u256,
+    );
+    fn set_mock_tick_params(ref self: TContractState, tick_lower: i32, tick_upper: i32);
+}
+
 // ========================================================================
 // Constants
 // ========================================================================
@@ -313,7 +326,7 @@ fn test_collect_protocol_fees_non_admin_fails() {
 
 #[test]
 fn test_shielded_swap() {
-    let (pool_address, _, _, _, pool_key) = setup();
+    let (pool_address, coordinator, _, _, pool_key) = setup();
     let pool = IZylithPoolDispatcher { contract_address: pool_address };
 
     start_cheat_caller_address(pool_address, user1());
@@ -326,13 +339,16 @@ fn test_shielded_swap() {
     pool.mint(pool_key, tick_lower, tick_upper, liquidity, user1());
     stop_cheat_caller_address(pool_address);
 
-    // Shielded swap (mock coordinator always approves)
+    // Configure mock coordinator with verified swap params
+    let mock = IMockCoordinatorSettersDispatcher { contract_address: coordinator };
+    mock.set_mock_swap_params(pool_key.token_0, pool_key.token_1, 1000, 0);
+
+    // Shielded swap — amount_in and tokens come from verified proof
     let dummy_proof: Array<felt252> = array![1, 2, 3];
-    let amount: u256 = 1000;
     let sqrt_price_limit: u256 = crate::clmm::math::sqrt_price::MIN_SQRT_PRICE + 1;
 
     start_cheat_caller_address(pool_address, user1());
-    pool.shielded_swap(pool_key, dummy_proof.span(), true, amount, sqrt_price_limit);
+    pool.shielded_swap(pool_key, dummy_proof.span(), sqrt_price_limit);
     stop_cheat_caller_address(pool_address);
 
     // CLMM state updated: price moved down
@@ -342,19 +358,23 @@ fn test_shielded_swap() {
 
 #[test]
 fn test_shielded_mint() {
-    let (pool_address, _, _, _, pool_key) = setup();
+    let (pool_address, coordinator, _, _, pool_key) = setup();
     let pool = IZylithPoolDispatcher { contract_address: pool_address };
 
     start_cheat_caller_address(pool_address, user1());
     pool.initialize(pool_key, SQRT_PRICE_1_0);
+    stop_cheat_caller_address(pool_address);
 
-    // Shielded mint: no token transfers, just CLMM state update
+    // Configure mock coordinator with verified tick params
+    let mock = IMockCoordinatorSettersDispatcher { contract_address: coordinator };
+    mock.set_mock_tick_params(-120, 120);
+
+    // Shielded mint: ticks from proof, liquidity from caller
     let dummy_proof: Array<felt252> = array![1, 2, 3];
-    let tick_lower: i32 = -120;
-    let tick_upper: i32 = 120;
     let liquidity: u128 = 1_000_000;
 
-    pool.shielded_mint(pool_key, dummy_proof.span(), tick_lower, tick_upper, liquidity);
+    start_cheat_caller_address(pool_address, user1());
+    pool.shielded_mint(pool_key, dummy_proof.span(), liquidity);
     stop_cheat_caller_address(pool_address);
 
     let state = pool.get_pool_state(pool_key);
@@ -363,22 +383,24 @@ fn test_shielded_mint() {
 
 #[test]
 fn test_shielded_burn() {
-    let (pool_address, _, _, _, pool_key) = setup();
+    let (pool_address, coordinator, _, _, pool_key) = setup();
     let pool = IZylithPoolDispatcher { contract_address: pool_address };
+
+    // Configure mock coordinator with verified tick params
+    let mock = IMockCoordinatorSettersDispatcher { contract_address: coordinator };
+    mock.set_mock_tick_params(-120, 120);
 
     start_cheat_caller_address(pool_address, user1());
     pool.initialize(pool_key, SQRT_PRICE_1_0);
 
     // Shielded mint first
     let dummy_proof: Array<felt252> = array![1, 2, 3];
-    let tick_lower: i32 = -120;
-    let tick_upper: i32 = 120;
     let liquidity: u128 = 1_000_000;
-    pool.shielded_mint(pool_key, dummy_proof.span(), tick_lower, tick_upper, liquidity);
+    pool.shielded_mint(pool_key, dummy_proof.span(), liquidity);
 
     // Shielded burn half
     let burn_amount: u128 = 500_000;
-    pool.shielded_burn(pool_key, dummy_proof.span(), tick_lower, tick_upper, burn_amount);
+    pool.shielded_burn(pool_key, dummy_proof.span(), burn_amount);
     stop_cheat_caller_address(pool_address);
 
     let state = pool.get_pool_state(pool_key);

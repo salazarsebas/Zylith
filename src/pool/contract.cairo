@@ -43,6 +43,7 @@ pub mod ZylithPool {
     use crate::interfaces::coordinator::{
         IVerifierCoordinatorDispatcher, IVerifierCoordinatorDispatcherTrait,
     };
+    use crate::verifier::types::offset_tick_to_signed;
 
     // ========================================================================
     // CONSTANTS
@@ -649,36 +650,42 @@ pub mod ZylithPool {
         /// Shielded swap: verify ZK proof via coordinator, then update CLMM state.
         /// No token transfers occur — tokens are managed via the commitment system.
         ///
-        /// NOTE: In production, swap parameters (zero_for_one, amount, limit) should be
+        /// Swap parameters (token_in, token_out, amount_in, amount_out_min) are
         /// extracted from verified proof public inputs to prevent parameter tampering.
-        /// Current implementation trusts caller-provided parameters backed by coordinator
-        /// proof verification.
+        /// Only sqrt_price_limit is caller-provided (additional slippage protection).
         fn shielded_swap(
             ref self: ContractState,
             pool_key: PoolKey,
             full_proof_with_hints: Span<felt252>,
-            zero_for_one: bool,
-            amount_specified: u256,
             sqrt_price_limit: u256,
         ) {
-            assert(amount_specified > 0, Errors::INVALID_AMOUNT);
-
             let pool_hash = self._hash_pool_key(pool_key);
             self._assert_pool_initialized(pool_hash);
 
-            // Verify proof via coordinator (handles nullifiers + Merkle tree)
+            // Verify proof and extract verified public inputs
             let coordinator = IVerifierCoordinatorDispatcher {
                 contract_address: self.coordinator.read(),
             };
-            let is_valid = coordinator.verify_swap(full_proof_with_hints);
-            assert(is_valid, Errors::INVALID_PROOF);
+            let pi = coordinator.verify_swap(full_proof_with_hints);
 
-            // Execute swap on CLMM state (no token transfers)
+            // Derive zero_for_one from verified token addresses
+            let zero_for_one = if pi.token_in == pool_key.token_0 {
+                assert(pi.token_out == pool_key.token_1, 'Token mismatch');
+                true
+            } else {
+                assert(pi.token_in == pool_key.token_1, 'Token not in pool');
+                assert(pi.token_out == pool_key.token_0, 'Token mismatch');
+                false
+            };
+
+            assert(pi.amount_in > 0, Errors::INVALID_AMOUNT);
+
+            // Execute swap with VERIFIED amount_in from proof
             let mut pool_state = self.pools.read(pool_hash);
 
             let (
                 _amount_in,
-                _amount_out,
+                amount_out,
                 final_sqrt_price,
                 final_tick,
                 final_liquidity,
@@ -693,9 +700,12 @@ pub mod ZylithPool {
                     pool_state,
                     pool_key.fee_tier,
                     zero_for_one,
-                    amount_specified,
+                    pi.amount_in,
                     sqrt_price_limit,
                 );
+
+            // Enforce minimum output from proof
+            assert(amount_out >= pi.amount_out_min, 'Insufficient output amount');
 
             pool_state.sqrt_price = final_sqrt_price;
             pool_state.tick = final_tick;
@@ -708,12 +718,11 @@ pub mod ZylithPool {
         }
 
         /// Shielded mint: verify ZK proof, then add liquidity to CLMM state.
+        /// Tick range is extracted from verified proof public inputs.
         fn shielded_mint(
             ref self: ContractState,
             pool_key: PoolKey,
             full_proof_with_hints: Span<felt252>,
-            tick_lower: i32,
-            tick_upper: i32,
             liquidity: u128,
         ) {
             assert(liquidity > 0, Errors::ZERO_LIQUIDITY);
@@ -721,12 +730,15 @@ pub mod ZylithPool {
             let pool_hash = self._hash_pool_key(pool_key);
             self._assert_pool_initialized(pool_hash);
 
-            // Verify proof via coordinator
+            // Verify proof and extract verified public inputs
             let coordinator = IVerifierCoordinatorDispatcher {
                 contract_address: self.coordinator.read(),
             };
-            let is_valid = coordinator.verify_mint(full_proof_with_hints);
-            assert(is_valid, Errors::INVALID_PROOF);
+            let pi = coordinator.verify_mint(full_proof_with_hints);
+
+            // Convert unsigned ticks from proof to signed ticks for CLMM
+            let tick_lower = offset_tick_to_signed(pi.tick_lower);
+            let tick_upper = offset_tick_to_signed(pi.tick_upper);
 
             // Add liquidity to CLMM state (no token transfers)
             let mut pool_state = self.pools.read(pool_hash);
@@ -735,8 +747,6 @@ pub mod ZylithPool {
             let (fee_growth_inside_0, fee_growth_inside_1) = self
                 ._get_fee_growth_inside(pool_hash, pool_state, tick_lower, tick_upper);
 
-            // Use a deterministic "shielded" owner address derived from the proof
-            // For now, use the caller as position owner
             let owner = get_caller_address();
             let position_hash = self
                 ._hash_position_key(pool_hash, owner, tick_lower, tick_upper);
@@ -773,12 +783,11 @@ pub mod ZylithPool {
         }
 
         /// Shielded burn: verify ZK proof, then remove liquidity from CLMM state.
+        /// Tick range is extracted from verified proof public inputs.
         fn shielded_burn(
             ref self: ContractState,
             pool_key: PoolKey,
             full_proof_with_hints: Span<felt252>,
-            tick_lower: i32,
-            tick_upper: i32,
             liquidity: u128,
         ) {
             assert(liquidity > 0, Errors::ZERO_LIQUIDITY);
@@ -786,12 +795,15 @@ pub mod ZylithPool {
             let pool_hash = self._hash_pool_key(pool_key);
             self._assert_pool_initialized(pool_hash);
 
-            // Verify proof via coordinator
+            // Verify proof and extract verified public inputs
             let coordinator = IVerifierCoordinatorDispatcher {
                 contract_address: self.coordinator.read(),
             };
-            let is_valid = coordinator.verify_burn(full_proof_with_hints);
-            assert(is_valid, Errors::INVALID_PROOF);
+            let pi = coordinator.verify_burn(full_proof_with_hints);
+
+            // Convert unsigned ticks from proof to signed ticks for CLMM
+            let tick_lower = offset_tick_to_signed(pi.tick_lower);
+            let tick_upper = offset_tick_to_signed(pi.tick_upper);
 
             // Remove liquidity from CLMM state (no token transfers)
             let mut pool_state = self.pools.read(pool_hash);
