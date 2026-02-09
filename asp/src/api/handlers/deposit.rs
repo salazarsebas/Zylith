@@ -85,3 +85,41 @@ pub fn decimal_to_hex(dec: &str) -> String {
         Err(_) => dec.to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hex_to_decimal_zero() {
+        assert_eq!(hex_to_decimal("0x0").unwrap(), "0");
+    }
+
+    #[test]
+    fn hex_to_decimal_small() {
+        assert_eq!(hex_to_decimal("0xff").unwrap(), "255");
+    }
+
+    #[test]
+    fn hex_to_decimal_large() {
+        // 0x100 = 256
+        assert_eq!(hex_to_decimal("0x100").unwrap(), "256");
+    }
+
+    #[test]
+    fn decimal_to_hex_roundtrip() {
+        let hex = "0xdeadbeef";
+        let dec = hex_to_decimal(hex).unwrap();
+        assert_eq!(decimal_to_hex(&dec), hex);
+    }
+
+    #[test]
+    fn decimal_to_hex_zero() {
+        assert_eq!(decimal_to_hex("0"), "0x0");
+    }
+
+    #[test]
+    fn decimal_to_hex_invalid_fallback() {
+        assert_eq!(decimal_to_hex("not_a_number"), "not_a_number");
+    }
+}

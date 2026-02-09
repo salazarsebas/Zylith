@@ -106,3 +106,65 @@ pub fn validate_secret(value: &str, field_name: &str) -> Result<(), AspError> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_hex_u256_valid() {
+        assert!(validate_hex_u256("0x1234abcdef", "test").is_ok());
+    }
+
+    #[test]
+    fn validate_hex_u256_empty() {
+        assert!(validate_hex_u256("", "test").is_err());
+    }
+
+    #[test]
+    fn validate_hex_u256_no_prefix() {
+        assert!(validate_hex_u256("1234", "test").is_err());
+    }
+
+    #[test]
+    fn validate_hex_u256_overflow() {
+        // 2^256 = 1 followed by 64 zeros in hex
+        let overflow = format!("0x1{}", "0".repeat(64));
+        assert!(validate_hex_u256(&overflow, "test").is_err());
+    }
+
+    #[test]
+    fn validate_hex_u256_max_valid() {
+        // 2^256 - 1 = ff...f (64 f's)
+        let max = format!("0x{}", "f".repeat(64));
+        assert!(validate_hex_u256(&max, "test").is_ok());
+    }
+
+    #[test]
+    fn validate_hex_u256_case_insensitive() {
+        assert!(validate_hex_u256("0XaBcDeF", "test").is_ok());
+    }
+
+    #[test]
+    fn validate_address_valid() {
+        assert!(validate_address("0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", "test").is_ok());
+    }
+
+    #[test]
+    fn validate_address_exceeds_felt252() {
+        // A value >= 2^251 + 17*2^192
+        let too_large = format!("0x{}", "f".repeat(64));
+        assert!(validate_address(&too_large, "test").is_err());
+    }
+
+    #[test]
+    fn validate_tick_range_valid() {
+        assert!(validate_tick_range(-100, 100).is_ok());
+    }
+
+    #[test]
+    fn validate_tick_range_lower_gte_upper() {
+        assert!(validate_tick_range(100, 100).is_err());
+        assert!(validate_tick_range(200, 100).is_err());
+    }
+}

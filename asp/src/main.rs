@@ -1,26 +1,12 @@
-mod api;
-mod config;
-mod db;
-mod error;
-mod prover;
-mod relayer;
-mod sync;
-
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing_subscriber::EnvFilter;
 
-use crate::config::Config;
-use crate::db::Database;
-use crate::prover::Worker;
-use crate::relayer::StarknetRelayer;
-
-pub struct AppState {
-    pub config: Config,
-    pub db: Database,
-    pub worker: Mutex<Worker>,
-    pub relayer: Mutex<StarknetRelayer>,
-}
+use zylith_asp::config::Config;
+use zylith_asp::db::Database;
+use zylith_asp::prover::Worker;
+use zylith_asp::relayer::{Relayer, StarknetRelayer};
+use zylith_asp::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -67,18 +53,18 @@ async fn main() -> anyhow::Result<()> {
         config: config.clone(),
         db,
         worker: Mutex::new(worker),
-        relayer: Mutex::new(relayer),
+        relayer: Mutex::new(Box::new(relayer) as Box<dyn Relayer>),
     });
 
     // Spawn event sync background task
     let sync_state = state.clone();
     let poll_interval = config.sync_poll_interval_secs;
     tokio::spawn(async move {
-        sync::events::start_event_sync(sync_state, poll_interval).await;
+        zylith_asp::sync::events::start_event_sync(sync_state, poll_interval).await;
     });
 
     // Build router
-    let app = api::routes::create_router(state.clone());
+    let app = zylith_asp::api::routes::create_router(state.clone());
 
     // Start server
     let addr = format!("{}:{}", config.host, config.port);

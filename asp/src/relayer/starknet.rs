@@ -9,6 +9,8 @@ use starknet::signers::{LocalWallet, SigningKey};
 use crate::config::Config;
 use crate::error::AspError;
 
+use super::Relayer;
+
 pub struct StarknetRelayer {
     account: SingleOwnerAccount<JsonRpcClient<HttpTransport>, LocalWallet>,
     coordinator_address: Felt,
@@ -61,8 +63,40 @@ impl StarknetRelayer {
         })
     }
 
-    /// Call coordinator.deposit(commitment: u256)
-    pub async fn deposit(&self, commitment: &str) -> Result<String, AspError> {
+    async fn send_transaction(&self, calls: Vec<Call>) -> Result<String, AspError> {
+        let execution = self.account.execute_v3(calls);
+
+        let result = execution
+            .send()
+            .await
+            .map_err(|e| AspError::TransactionFailed(format!("{e}")))?;
+
+        let tx_hash = format!("{:#x}", result.transaction_hash);
+        tracing::info!(tx_hash = %tx_hash, "Transaction sent, waiting for confirmation...");
+
+        // Wait for transaction receipt
+        watch_tx(self.account.provider(), result.transaction_hash).await?;
+
+        tracing::info!(tx_hash = %tx_hash, "Transaction confirmed");
+        Ok(tx_hash)
+    }
+
+    pub fn coordinator_address(&self) -> &Felt {
+        &self.coordinator_address
+    }
+
+    pub fn pool_address(&self) -> &Felt {
+        &self.pool_address
+    }
+
+    pub fn provider(&self) -> &JsonRpcClient<HttpTransport> {
+        self.account.provider()
+    }
+}
+
+#[async_trait::async_trait]
+impl Relayer for StarknetRelayer {
+    async fn deposit(&self, commitment: &str) -> Result<String, AspError> {
         let (low, high) = u256_to_felts(commitment)?;
 
         let call = Call {
@@ -75,8 +109,7 @@ impl StarknetRelayer {
         self.send_transaction(vec![call]).await
     }
 
-    /// Call coordinator.submit_merkle_root(root: u256)
-    pub async fn submit_merkle_root(&self, root: &str) -> Result<String, AspError> {
+    async fn submit_merkle_root(&self, root: &str) -> Result<String, AspError> {
         let (low, high) = u256_to_felts(root)?;
 
         let call = Call {
@@ -89,8 +122,7 @@ impl StarknetRelayer {
         self.send_transaction(vec![call]).await
     }
 
-    /// Call coordinator.verify_membership(full_proof_with_hints: Span<felt252>)
-    pub async fn verify_membership(&self, calldata_hex: &[String]) -> Result<String, AspError> {
+    async fn verify_membership(&self, calldata_hex: &[String]) -> Result<String, AspError> {
         let calldata = build_span_calldata(calldata_hex)?;
 
         let call = Call {
@@ -103,8 +135,7 @@ impl StarknetRelayer {
         self.send_transaction(vec![call]).await
     }
 
-    /// Call pool.shielded_swap(pool_key, full_proof_with_hints, sqrt_price_limit)
-    pub async fn shielded_swap(
+    async fn shielded_swap(
         &self,
         pool_key: &PoolKeyParams,
         proof_calldata_hex: &[String],
@@ -112,7 +143,6 @@ impl StarknetRelayer {
     ) -> Result<String, AspError> {
         let mut calldata = Vec::new();
 
-        // PoolKey: token_0, token_1, fee, tick_spacing (4 felts)
         calldata.push(
             Felt::from_hex(&pool_key.token_0)
                 .map_err(|e| AspError::InvalidInput(format!("Invalid token_0: {e}")))?,
@@ -124,11 +154,9 @@ impl StarknetRelayer {
         calldata.push(Felt::from(pool_key.fee));
         calldata.push(Felt::from(pool_key.tick_spacing));
 
-        // Span<felt252>: length + elements
         let span = build_span_calldata(proof_calldata_hex)?;
         calldata.extend(span);
 
-        // sqrt_price_limit: u256
         let (low, high) = u256_to_felts(sqrt_price_limit)?;
         calldata.push(low);
         calldata.push(high);
@@ -143,8 +171,7 @@ impl StarknetRelayer {
         self.send_transaction(vec![call]).await
     }
 
-    /// Call pool.shielded_mint(pool_key, full_proof_with_hints, liquidity)
-    pub async fn shielded_mint(
+    async fn shielded_mint(
         &self,
         pool_key: &PoolKeyParams,
         proof_calldata_hex: &[String],
@@ -178,8 +205,7 @@ impl StarknetRelayer {
         self.send_transaction(vec![call]).await
     }
 
-    /// Call pool.shielded_burn(pool_key, full_proof_with_hints, liquidity)
-    pub async fn shielded_burn(
+    async fn shielded_burn(
         &self,
         pool_key: &PoolKeyParams,
         proof_calldata_hex: &[String],
@@ -211,36 +237,6 @@ impl StarknetRelayer {
         };
 
         self.send_transaction(vec![call]).await
-    }
-
-    async fn send_transaction(&self, calls: Vec<Call>) -> Result<String, AspError> {
-        let execution = self.account.execute_v3(calls);
-
-        let result = execution
-            .send()
-            .await
-            .map_err(|e| AspError::TransactionFailed(format!("{e}")))?;
-
-        let tx_hash = format!("{:#x}", result.transaction_hash);
-        tracing::info!(tx_hash = %tx_hash, "Transaction sent, waiting for confirmation...");
-
-        // Wait for transaction receipt
-        watch_tx(self.account.provider(), result.transaction_hash).await?;
-
-        tracing::info!(tx_hash = %tx_hash, "Transaction confirmed");
-        Ok(tx_hash)
-    }
-
-    pub fn coordinator_address(&self) -> &Felt {
-        &self.coordinator_address
-    }
-
-    pub fn pool_address(&self) -> &Felt {
-        &self.pool_address
-    }
-
-    pub fn provider(&self) -> &JsonRpcClient<HttpTransport> {
-        self.account.provider()
     }
 }
 
@@ -331,6 +327,34 @@ async fn watch_tx(
         tx_hash,
         max_retries * 2
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn u256_to_felts_zero() {
+        let (low, high) = u256_to_felts("0").unwrap();
+        assert_eq!(low, Felt::ZERO);
+        assert_eq!(high, Felt::ZERO);
+    }
+
+    #[test]
+    fn u256_to_felts_small() {
+        let (low, high) = u256_to_felts("0xff").unwrap();
+        assert_eq!(low, Felt::from(255u64));
+        assert_eq!(high, Felt::ZERO);
+    }
+
+    #[test]
+    fn u256_to_felts_large_split() {
+        // 2^128 = 1 in high, 0 in low
+        let val = "340282366920938463463374607431768211456"; // 2^128
+        let (low, high) = u256_to_felts(val).unwrap();
+        assert_eq!(low, Felt::ZERO);
+        assert_eq!(high, Felt::ONE);
+    }
 }
 
 /// Decrypt a starkli-format keystore to get the private key.

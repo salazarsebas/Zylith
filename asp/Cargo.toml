@@ -44,5 +44,12 @@ hex = "0.4"
 governor = "0.8"
 tower_governor = "0.6"
 
+# Async trait (for dyn Relayer dispatch)
+async-trait = "0.1"
+
 # Misc
 uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+axum-test = "18"
+tempfile = "3"

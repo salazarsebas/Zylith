@@ -184,3 +184,121 @@ impl Database {
             .is_ok()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_db() -> Database {
+        let db = Database::new(":memory:").unwrap();
+        db.run_migrations().unwrap();
+        db
+    }
+
+    #[test]
+    fn test_insert_and_get_commitment() {
+        let db = test_db();
+        db.insert_commitment(0, "12345", Some("0xabc")).unwrap();
+        let row = db.get_commitment(0).unwrap().unwrap();
+        assert_eq!(row.leaf_index, 0);
+        assert_eq!(row.commitment, "12345");
+        assert_eq!(row.deposit_tx.as_deref(), Some("0xabc"));
+    }
+
+    #[test]
+    fn test_get_leaf_count() {
+        let db = test_db();
+        assert_eq!(db.get_leaf_count().unwrap(), 0);
+        db.insert_commitment(0, "aaa", None).unwrap();
+        assert_eq!(db.get_leaf_count().unwrap(), 1);
+        db.insert_commitment(1, "bbb", None).unwrap();
+        assert_eq!(db.get_leaf_count().unwrap(), 2);
+    }
+
+    #[test]
+    fn test_insert_commitment_idempotent() {
+        let db = test_db();
+        db.insert_commitment(0, "aaa", None).unwrap();
+        // INSERT OR IGNORE — should not error on duplicate
+        db.insert_commitment(0, "aaa", None).unwrap();
+        assert_eq!(db.get_leaf_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn test_insert_and_get_root() {
+        let db = test_db();
+        db.insert_root("root123", 1, Some("0xdef")).unwrap();
+        let root = db.get_latest_root().unwrap();
+        assert_eq!(root.as_deref(), Some("root123"));
+    }
+
+    #[test]
+    fn test_get_latest_root_empty() {
+        let db = test_db();
+        assert!(db.get_latest_root().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_nullifier_lifecycle() {
+        let db = test_db();
+        db.insert_nullifier("nul1", "membership", Some("0x111"))
+            .unwrap();
+        assert!(db.is_nullifier_spent("nul1").unwrap());
+        let row = db.get_nullifier("nul1").unwrap().unwrap();
+        assert_eq!(row.circuit_type, "membership");
+        assert_eq!(row.tx_hash.as_deref(), Some("0x111"));
+    }
+
+    #[test]
+    fn test_nullifier_not_found() {
+        let db = test_db();
+        assert!(!db.is_nullifier_spent("nonexistent").unwrap());
+        assert!(db.get_nullifier("nonexistent").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_nullifier_idempotent() {
+        let db = test_db();
+        db.insert_nullifier("nul1", "swap", None).unwrap();
+        // INSERT OR IGNORE — should not error
+        db.insert_nullifier("nul1", "swap", None).unwrap();
+        assert!(db.is_nullifier_spent("nul1").unwrap());
+    }
+
+    #[test]
+    fn test_sync_state() {
+        let db = test_db();
+        assert!(db.get_sync_state("last_block").unwrap().is_none());
+        db.set_sync_state("last_block", "100").unwrap();
+        assert_eq!(
+            db.get_sync_state("last_block").unwrap().as_deref(),
+            Some("100")
+        );
+        // Overwrite
+        db.set_sync_state("last_block", "200").unwrap();
+        assert_eq!(
+            db.get_sync_state("last_block").unwrap().as_deref(),
+            Some("200")
+        );
+    }
+
+    #[test]
+    fn test_is_healthy() {
+        let db = test_db();
+        assert!(db.is_healthy());
+    }
+
+    #[test]
+    fn test_get_all_commitments_ordered() {
+        let db = test_db();
+        db.insert_commitment(2, "ccc", None).unwrap();
+        db.insert_commitment(0, "aaa", None).unwrap();
+        db.insert_commitment(1, "bbb", None).unwrap();
+
+        let all = db.get_all_commitments().unwrap();
+        assert_eq!(all.len(), 3);
+        assert_eq!(all[0].leaf_index, 0);
+        assert_eq!(all[1].leaf_index, 1);
+        assert_eq!(all[2].leaf_index, 2);
+    }
+}

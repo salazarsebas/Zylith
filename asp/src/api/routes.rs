@@ -12,16 +12,8 @@ use crate::AppState;
 use super::handlers;
 use super::middleware::request_logger;
 
-pub fn create_router(state: Arc<AppState>) -> Router {
-    // Rate limiter: 2 req/sec sustained, 30 burst per IP
-    let governor_conf = Arc::new(
-        GovernorConfigBuilder::default()
-            .per_second(2)
-            .burst_size(30)
-            .finish()
-            .expect("Failed to build rate limiter config"),
-    );
-
+/// Core routes shared by production and test routers.
+fn base_router(state: Arc<AppState>) -> Router {
     Router::new()
         // Deposit & withdrawal
         .route("/deposit", post(handlers::deposit::deposit))
@@ -40,11 +32,31 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         )
         // Status
         .route("/status", get(handlers::status::get_status))
-        // Middleware (applied bottom-to-top)
+        .with_state(state)
+}
+
+/// Production router with rate limiting, logging, and CORS.
+pub fn create_router(state: Arc<AppState>) -> Router {
+    // Rate limiter: 2 req/sec sustained, 30 burst per IP
+    let governor_conf = Arc::new(
+        GovernorConfigBuilder::default()
+            .per_second(2)
+            .burst_size(30)
+            .finish()
+            .expect("Failed to build rate limiter config"),
+    );
+
+    base_router(state)
         .layer(middleware::from_fn(request_logger))
         .layer(GovernorLayer {
             config: governor_conf,
         })
         .layer(CorsLayer::permissive())
-        .with_state(state)
+}
+
+/// Test router without rate limiting (no real socket for IP extraction).
+pub fn create_test_router(state: Arc<AppState>) -> Router {
+    base_router(state)
+        .layer(middleware::from_fn(request_logger))
+        .layer(CorsLayer::permissive())
 }
