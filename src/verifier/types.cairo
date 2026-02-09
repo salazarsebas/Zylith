@@ -22,21 +22,24 @@ use starknet::ContractAddress;
 // ============================================================================
 // Circuit-Specific Public Input Structures
 // ============================================================================
+// NOTE: BN254 Poseidon hash outputs (root, nullifier_hash, commitment) are
+// BN254 scalar field elements (~2^254) which exceed the Stark field (~2^251).
+// These MUST be stored as u256, not felt252.
 
 /// Public inputs for Membership circuit (2 signals)
 #[derive(Drop, Copy, Serde, PartialEq, Debug)]
 pub struct MembershipPublicInputs {
-    pub root: felt252,
-    pub nullifier_hash: felt252,
+    pub root: u256,
+    pub nullifier_hash: u256,
 }
 
 /// Public inputs for Swap circuit (8 signals)
 #[derive(Drop, Copy, Serde, PartialEq, Debug)]
 pub struct SwapPublicInputs {
-    pub change_commitment: felt252,
-    pub root: felt252,
-    pub nullifier_hash: felt252,
-    pub new_commitment: felt252,
+    pub change_commitment: u256,
+    pub root: u256,
+    pub nullifier_hash: u256,
+    pub new_commitment: u256,
     pub token_in: ContractAddress,
     pub token_out: ContractAddress,
     pub amount_in: u256,
@@ -46,12 +49,12 @@ pub struct SwapPublicInputs {
 /// Public inputs for Mint circuit (8 signals)
 #[derive(Drop, Copy, Serde, PartialEq, Debug)]
 pub struct MintPublicInputs {
-    pub change_commitment0: felt252,
-    pub change_commitment1: felt252,
-    pub root: felt252,
-    pub nullifier_hash0: felt252,
-    pub nullifier_hash1: felt252,
-    pub position_commitment: felt252,
+    pub change_commitment0: u256,
+    pub change_commitment1: u256,
+    pub root: u256,
+    pub nullifier_hash0: u256,
+    pub nullifier_hash1: u256,
+    pub position_commitment: u256,
     pub tick_lower: u32,
     pub tick_upper: u32,
 }
@@ -59,10 +62,10 @@ pub struct MintPublicInputs {
 /// Public inputs for Burn circuit (6 signals)
 #[derive(Drop, Copy, Serde, PartialEq, Debug)]
 pub struct BurnPublicInputs {
-    pub root: felt252,
-    pub position_nullifier_hash: felt252,
-    pub new_commitment0: felt252,
-    pub new_commitment1: felt252,
+    pub root: u256,
+    pub position_nullifier_hash: u256,
+    pub new_commitment0: u256,
+    pub new_commitment1: u256,
     pub tick_lower: u32,
     pub tick_upper: u32,
 }
@@ -75,9 +78,7 @@ pub struct BurnPublicInputs {
 /// Garaga order: [root, nullifierHash]
 pub fn extract_membership_inputs(inputs: Span<u256>) -> MembershipPublicInputs {
     assert(inputs.len() == PublicInputCounts::MEMBERSHIP, Errors::INVALID_PUBLIC_INPUT_COUNT);
-    MembershipPublicInputs {
-        root: u256_to_felt(*inputs.at(0)), nullifier_hash: u256_to_felt(*inputs.at(1)),
-    }
+    MembershipPublicInputs { root: *inputs.at(0), nullifier_hash: *inputs.at(1) }
 }
 
 /// Extract SwapPublicInputs from Garaga verifier result
@@ -86,10 +87,10 @@ pub fn extract_membership_inputs(inputs: Span<u256>) -> MembershipPublicInputs {
 pub fn extract_swap_inputs(inputs: Span<u256>) -> SwapPublicInputs {
     assert(inputs.len() == PublicInputCounts::SWAP, Errors::INVALID_PUBLIC_INPUT_COUNT);
     SwapPublicInputs {
-        change_commitment: u256_to_felt(*inputs.at(0)),
-        root: u256_to_felt(*inputs.at(1)),
-        nullifier_hash: u256_to_felt(*inputs.at(2)),
-        new_commitment: u256_to_felt(*inputs.at(3)),
+        change_commitment: *inputs.at(0),
+        root: *inputs.at(1),
+        nullifier_hash: *inputs.at(2),
+        new_commitment: *inputs.at(3),
         token_in: u256_to_felt(*inputs.at(4)).try_into().expect('invalid token_in'),
         token_out: u256_to_felt(*inputs.at(5)).try_into().expect('invalid token_out'),
         amount_in: *inputs.at(6),
@@ -103,12 +104,12 @@ pub fn extract_swap_inputs(inputs: Span<u256>) -> SwapPublicInputs {
 pub fn extract_mint_inputs(inputs: Span<u256>) -> MintPublicInputs {
     assert(inputs.len() == PublicInputCounts::MINT, Errors::INVALID_PUBLIC_INPUT_COUNT);
     MintPublicInputs {
-        change_commitment0: u256_to_felt(*inputs.at(0)),
-        change_commitment1: u256_to_felt(*inputs.at(1)),
-        root: u256_to_felt(*inputs.at(2)),
-        nullifier_hash0: u256_to_felt(*inputs.at(3)),
-        nullifier_hash1: u256_to_felt(*inputs.at(4)),
-        position_commitment: u256_to_felt(*inputs.at(5)),
+        change_commitment0: *inputs.at(0),
+        change_commitment1: *inputs.at(1),
+        root: *inputs.at(2),
+        nullifier_hash0: *inputs.at(3),
+        nullifier_hash1: *inputs.at(4),
+        position_commitment: *inputs.at(5),
         tick_lower: u256_to_u32(*inputs.at(6)),
         tick_upper: u256_to_u32(*inputs.at(7)),
     }
@@ -120,10 +121,10 @@ pub fn extract_mint_inputs(inputs: Span<u256>) -> MintPublicInputs {
 pub fn extract_burn_inputs(inputs: Span<u256>) -> BurnPublicInputs {
     assert(inputs.len() == PublicInputCounts::BURN, Errors::INVALID_PUBLIC_INPUT_COUNT);
     BurnPublicInputs {
-        root: u256_to_felt(*inputs.at(0)),
-        position_nullifier_hash: u256_to_felt(*inputs.at(1)),
-        new_commitment0: u256_to_felt(*inputs.at(2)),
-        new_commitment1: u256_to_felt(*inputs.at(3)),
+        root: *inputs.at(0),
+        position_nullifier_hash: *inputs.at(1),
+        new_commitment0: *inputs.at(2),
+        new_commitment1: *inputs.at(3),
         tick_lower: u256_to_u32(*inputs.at(4)),
         tick_upper: u256_to_u32(*inputs.at(5)),
     }
@@ -133,7 +134,7 @@ pub fn extract_burn_inputs(inputs: Span<u256>) -> BurnPublicInputs {
 // Conversion Helpers
 // ============================================================================
 
-/// Convert u256 to felt252 (safe for BN254 field elements)
+/// Convert u256 to felt252 (safe for Starknet addresses and small values)
 fn u256_to_felt(value: u256) -> felt252 {
     value.try_into().expect('u256 overflow for felt252')
 }
@@ -181,4 +182,5 @@ pub mod Errors {
     pub const NULLIFIER_SPENT: felt252 = 'VERIFIER: nullifier spent';
     pub const INVALID_TICK_RANGE: felt252 = 'VERIFIER: invalid tick range';
     pub const CONTRACT_PAUSED: felt252 = 'VERIFIER: contract paused';
+    pub const INVALID_COMMITMENT: felt252 = 'VERIFIER: invalid commitment';
 }

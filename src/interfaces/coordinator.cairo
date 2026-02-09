@@ -8,7 +8,7 @@
 ///
 /// ## State Management
 ///
-/// - **Nullifiers**: LegacyMap<felt252, bool> tracking spent nullifier hashes
+/// - **Nullifiers**: Map<u256, bool> tracking spent nullifier hashes
 /// - **Merkle Tree**: Incremental tree with 100-root history
 /// - **Verifier Addresses**: Contract addresses for each Garaga verifier
 ///
@@ -126,13 +126,13 @@ pub trait IVerifierCoordinator<TContractState> {
     // ========================================================================
 
     /// Check if a nullifier has been spent
-    fn is_nullifier_spent(self: @TContractState, nullifier_hash: felt252) -> bool;
+    fn is_nullifier_spent(self: @TContractState, nullifier_hash: u256) -> bool;
 
     /// Get current Merkle tree root
-    fn get_merkle_root(self: @TContractState) -> felt252;
+    fn get_merkle_root(self: @TContractState) -> u256;
 
     /// Check if a root is known (in root history)
-    fn is_known_root(self: @TContractState, root: felt252) -> bool;
+    fn is_known_root(self: @TContractState, root: u256) -> bool;
 
     /// Get the next leaf index for Merkle tree insertion
     fn get_next_leaf_index(self: @TContractState) -> u32;
@@ -140,6 +140,35 @@ pub trait IVerifierCoordinator<TContractState> {
     // ========================================================================
     // Admin Functions
     // ========================================================================
+
+    /// Deposit a commitment into the Merkle tree (admin only)
+    ///
+    /// Stores the commitment for off-chain tree reconstruction.
+    /// The Merkle root must be submitted separately via `submit_merkle_root`
+    /// because the on-chain tree uses Stark-field Poseidon while the Circom
+    /// circuits use BN128-field Poseidon (different fields).
+    ///
+    /// # Arguments
+    /// * `commitment` - The note commitment (BN128 Poseidon hash)
+    ///
+    /// # Side Effects
+    /// * Stores commitment at next_leaf_index
+    /// * Increments next_leaf_index
+    /// * Emits CommitmentAdded event
+    fn deposit(ref self: TContractState, commitment: u256);
+
+    /// Submit an off-chain computed Merkle root (admin only)
+    ///
+    /// The root is computed off-chain using BN128-field Poseidon (matching
+    /// the Circom circuits). This bridges the hash function mismatch between
+    /// Circom (BN128) and Cairo (Stark field).
+    ///
+    /// # Arguments
+    /// * `root` - The BN128-Poseidon Merkle root
+    ///
+    /// # Side Effects
+    /// * Adds root to the circular root history buffer
+    fn submit_merkle_root(ref self: TContractState, root: u256);
 
     /// Pause all verification operations (emergency only)
     fn pause(ref self: TContractState);

@@ -78,21 +78,25 @@ pub mod MockCoordinator {
             }
         }
 
-        fn is_nullifier_spent(self: @ContractState, nullifier_hash: felt252) -> bool {
+        fn is_nullifier_spent(self: @ContractState, nullifier_hash: u256) -> bool {
             false
         }
 
-        fn get_merkle_root(self: @ContractState) -> felt252 {
+        fn get_merkle_root(self: @ContractState) -> u256 {
             0
         }
 
-        fn is_known_root(self: @ContractState, root: felt252) -> bool {
+        fn is_known_root(self: @ContractState, root: u256) -> bool {
             true
         }
 
         fn get_next_leaf_index(self: @ContractState) -> u32 {
             0
         }
+
+        fn deposit(ref self: ContractState, commitment: u256) {}
+
+        fn submit_merkle_root(ref self: ContractState, root: u256) {}
 
         fn pause(ref self: ContractState) {
             assert(get_caller_address() == self.admin.read(), 'Only admin');

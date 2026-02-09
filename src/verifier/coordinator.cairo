@@ -55,13 +55,16 @@ pub mod VerifierCoordinator {
         swap_verifier: ContractAddress,
         mint_verifier: ContractAddress,
         burn_verifier: ContractAddress,
-        // Nullifier tracking: nullifier_hash => is_spent
-        nullifiers: Map<felt252, bool>,
-        // Merkle tree state
+        // Nullifier tracking: nullifier_hash => is_spent (u256 for BN254 field elements)
+        nullifiers: Map<u256, bool>,
+        // Merkle tree state (Stark-field Poseidon, used for internal incremental tree)
         filled_subtrees: Map<u32, felt252>,
-        roots: Map<u32, felt252>,
+        // Root history (u256 for BN254 Poseidon roots submitted via submit_merkle_root)
+        roots: Map<u32, u256>,
         current_root_index: u32,
         next_leaf_index: u32,
+        // Commitment storage (u256 for BN254 field elements)
+        commitments: Map<u32, u256>,
         // Admin and state
         admin: ContractAddress,
         paused: bool,
@@ -87,18 +90,16 @@ pub mod VerifierCoordinator {
 
     #[derive(Drop, starknet::Event)]
     pub struct MembershipVerified {
-        #[key]
-        pub nullifier_hash: felt252,
-        pub root: felt252,
+        pub nullifier_hash: u256,
+        pub root: u256,
         pub timestamp: u64,
     }
 
     #[derive(Drop, starknet::Event)]
     pub struct SwapVerified {
-        #[key]
-        pub nullifier_hash: felt252,
-        pub new_commitment: felt252,
-        pub change_commitment: felt252,
+        pub nullifier_hash: u256,
+        pub new_commitment: u256,
+        pub change_commitment: u256,
         pub token_in: ContractAddress,
         pub token_out: ContractAddress,
         pub timestamp: u64,
@@ -106,10 +107,9 @@ pub mod VerifierCoordinator {
 
     #[derive(Drop, starknet::Event)]
     pub struct MintVerified {
-        #[key]
-        pub nullifier_hash0: felt252,
-        pub nullifier_hash1: felt252,
-        pub position_commitment: felt252,
+        pub nullifier_hash0: u256,
+        pub nullifier_hash1: u256,
+        pub position_commitment: u256,
         pub tick_lower: u32,
         pub tick_upper: u32,
         pub timestamp: u64,
@@ -117,10 +117,9 @@ pub mod VerifierCoordinator {
 
     #[derive(Drop, starknet::Event)]
     pub struct BurnVerified {
-        #[key]
-        pub position_nullifier_hash: felt252,
-        pub new_commitment0: felt252,
-        pub new_commitment1: felt252,
+        pub position_nullifier_hash: u256,
+        pub new_commitment0: u256,
+        pub new_commitment1: u256,
         pub tick_lower: u32,
         pub tick_upper: u32,
         pub timestamp: u64,
@@ -128,16 +127,14 @@ pub mod VerifierCoordinator {
 
     #[derive(Drop, starknet::Event)]
     pub struct CommitmentAdded {
-        #[key]
-        pub commitment: felt252,
+        pub commitment: u256,
         pub leaf_index: u32,
-        pub new_root: felt252,
+        pub new_root: u256,
     }
 
     #[derive(Drop, starknet::Event)]
     pub struct NullifierSpent {
-        #[key]
-        pub nullifier_hash: felt252,
+        pub nullifier_hash: u256,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -348,16 +345,16 @@ pub mod VerifierCoordinator {
         // STATE QUERY FUNCTIONS
         // ====================================================================
 
-        fn is_nullifier_spent(self: @ContractState, nullifier_hash: felt252) -> bool {
+        fn is_nullifier_spent(self: @ContractState, nullifier_hash: u256) -> bool {
             self.nullifiers.read(nullifier_hash)
         }
 
-        fn get_merkle_root(self: @ContractState) -> felt252 {
+        fn get_merkle_root(self: @ContractState) -> u256 {
             let index = self.current_root_index.read();
             self.roots.read(index)
         }
 
-        fn is_known_root(self: @ContractState, root: felt252) -> bool {
+        fn is_known_root(self: @ContractState, root: u256) -> bool {
             self._is_known_root(root)
         }
 
@@ -368,6 +365,30 @@ pub mod VerifierCoordinator {
         // ====================================================================
         // ADMIN FUNCTIONS
         // ====================================================================
+
+        fn deposit(ref self: ContractState, commitment: u256) {
+            self._assert_admin();
+            self._assert_not_paused();
+            assert(commitment != 0, Errors::INVALID_COMMITMENT);
+
+            let leaf_index = self.next_leaf_index.read();
+            assert(leaf_index < MAX_LEAVES, 'Merkle tree is full');
+
+            // Store commitment for off-chain tree reconstruction
+            self.commitments.write(leaf_index, commitment);
+            self.next_leaf_index.write(leaf_index + 1);
+
+            self.emit(CommitmentAdded { commitment, leaf_index, new_root: 0 });
+        }
+
+        fn submit_merkle_root(ref self: ContractState, root: u256) {
+            self._assert_admin();
+            assert(root != 0, Errors::UNKNOWN_ROOT);
+
+            let new_root_index = (self.current_root_index.read() + 1) % ROOT_HISTORY_SIZE;
+            self.roots.write(new_root_index, root);
+            self.current_root_index.write(new_root_index);
+        }
 
         fn pause(ref self: ContractState) {
             self._assert_admin();
@@ -407,14 +428,14 @@ pub mod VerifierCoordinator {
                 level += 1;
             }
 
-            let empty_root = get_zero_value(TREE_HEIGHT);
-            self.roots.write(0, empty_root);
+            // Initialize root history with zero (empty tree)
+            self.roots.write(0, 0);
             self.current_root_index.write(0);
             self.next_leaf_index.write(0);
         }
 
         /// Check if root is in the history
-        fn _is_known_root(self: @ContractState, root: felt252) -> bool {
+        fn _is_known_root(self: @ContractState, root: u256) -> bool {
             if root == 0 {
                 return false;
             }
@@ -448,12 +469,22 @@ pub mod VerifierCoordinator {
             false
         }
 
-        /// Insert a commitment into the Merkle tree
-        fn _insert_commitment(ref self: ContractState, commitment: felt252) {
+        /// Insert a commitment into the Merkle tree (Stark-field incremental tree)
+        /// Note: This tree uses Stark Poseidon which differs from BN128 Poseidon.
+        /// The resulting root is NOT used for proof verification — roots are
+        /// submitted externally via submit_merkle_root.
+        fn _insert_commitment(ref self: ContractState, commitment: u256) {
             let leaf_index = self.next_leaf_index.read();
             assert(leaf_index < MAX_LEAVES, 'Merkle tree is full');
 
-            let mut current_hash = commitment;
+            // Store commitment for off-chain tree reconstruction
+            self.commitments.write(leaf_index, commitment);
+
+            // Update Stark-field incremental tree (for internal bookkeeping)
+            // Truncate u256 to felt252 for Stark Poseidon — this tree's root
+            // is not used for proof verification
+            let commitment_felt: felt252 = commitment.try_into().unwrap_or(0);
+            let mut current_hash = commitment_felt;
             let mut current_index = leaf_index;
             let mut level: u32 = 0;
 
@@ -473,19 +504,17 @@ pub mod VerifierCoordinator {
 
                 current_index = current_index / 2;
                 level += 1;
-            }
-
-            let new_root_index = (self.current_root_index.read() + 1) % ROOT_HISTORY_SIZE;
-            self.roots.write(new_root_index, current_hash);
-            self.current_root_index.write(new_root_index);
+            };
 
             self.next_leaf_index.write(leaf_index + 1);
 
-            self.emit(CommitmentAdded { commitment, leaf_index, new_root: current_hash });
+            // Note: We do NOT update roots here — the Stark Poseidon root
+            // differs from the BN128 root. Roots are submitted via submit_merkle_root.
+            self.emit(CommitmentAdded { commitment, leaf_index, new_root: 0 });
         }
 
         /// Mark nullifier as spent
-        fn _mark_nullifier_spent(ref self: ContractState, nullifier_hash: felt252) {
+        fn _mark_nullifier_spent(ref self: ContractState, nullifier_hash: u256) {
             self.nullifiers.write(nullifier_hash, true);
             self.emit(NullifierSpent { nullifier_hash });
         }
@@ -498,11 +527,11 @@ pub mod VerifierCoordinator {
             assert(!self.paused.read(), Errors::CONTRACT_PAUSED);
         }
 
-        fn _assert_known_root(self: @ContractState, root: felt252) {
+        fn _assert_known_root(self: @ContractState, root: u256) {
             assert(self._is_known_root(root), Errors::UNKNOWN_ROOT);
         }
 
-        fn _assert_nullifier_not_spent(self: @ContractState, nullifier_hash: felt252) {
+        fn _assert_nullifier_not_spent(self: @ContractState, nullifier_hash: u256) {
             assert(!self.nullifiers.read(nullifier_hash), Errors::NULLIFIER_SPENT);
         }
 
