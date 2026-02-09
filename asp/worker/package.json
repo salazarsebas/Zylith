@@ -1,0 +1,10 @@
+{
+  "name": "zylith-asp-worker",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Node.js proof generation worker for Zylith ASP",
+  "dependencies": {
+    "circomlibjs": "^0.1.7",
+    "snarkjs": "^0.7.0"
+  }
+}
