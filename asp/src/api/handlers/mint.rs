@@ -4,15 +4,57 @@ use axum::extract::State;
 use axum::Json;
 
 use crate::api::types::{MintRequest, MintResponse};
+use crate::api::validation::{
+    validate_address, validate_decimal, validate_secret, validate_tick_range,
+};
 use crate::error::AspError;
 use crate::AppState;
 
 const TICK_OFFSET: i32 = 887272;
 
+fn validate_mint_request(req: &MintRequest) -> Result<(), AspError> {
+    for (prefix, note) in [
+        ("input_note_0", &req.input_note_0),
+        ("input_note_1", &req.input_note_1),
+    ] {
+        validate_secret(&note.secret, &format!("{prefix}.secret"))?;
+        validate_secret(&note.nullifier, &format!("{prefix}.nullifier"))?;
+        validate_decimal(&note.balance_low, &format!("{prefix}.balance_low"))?;
+        validate_decimal(&note.balance_high, &format!("{prefix}.balance_high"))?;
+        validate_address(&note.token, &format!("{prefix}.token"))?;
+    }
+
+    validate_secret(&req.position.secret, "position.secret")?;
+    validate_secret(&req.position.nullifier, "position.nullifier")?;
+    validate_decimal(&req.position.liquidity, "position.liquidity")?;
+    validate_tick_range(req.position.tick_lower, req.position.tick_upper)?;
+
+    validate_decimal(&req.amounts.amount0_low, "amounts.amount0_low")?;
+    validate_decimal(&req.amounts.amount0_high, "amounts.amount0_high")?;
+    validate_decimal(&req.amounts.amount1_low, "amounts.amount1_low")?;
+    validate_decimal(&req.amounts.amount1_high, "amounts.amount1_high")?;
+
+    validate_secret(&req.change_note_0.secret, "change_note_0.secret")?;
+    validate_secret(&req.change_note_0.nullifier, "change_note_0.nullifier")?;
+    validate_secret(&req.change_note_1.secret, "change_note_1.secret")?;
+    validate_secret(&req.change_note_1.nullifier, "change_note_1.nullifier")?;
+
+    validate_address(&req.pool_key.token_0, "pool_key.token_0")?;
+    validate_address(&req.pool_key.token_1, "pool_key.token_1")?;
+
+    if req.liquidity == 0 {
+        return Err(AspError::InvalidInput("liquidity must be > 0".into()));
+    }
+
+    Ok(())
+}
+
 pub async fn shielded_mint(
     State(state): State<Arc<AppState>>,
     Json(req): Json<MintRequest>,
 ) -> Result<Json<MintResponse>, AspError> {
+    validate_mint_request(&req)?;
+
     tracing::info!(
         tick_lower = req.position.tick_lower,
         tick_upper = req.position.tick_upper,
@@ -59,7 +101,9 @@ pub async fn shielded_mint(
             None => return Err(AspError::CommitmentNotFound(note.leaf_index)),
         }
         if state.db.is_nullifier_spent(&result.nullifier_hash)? {
-            return Err(AspError::NullifierAlreadySpent(result.nullifier_hash.clone()));
+            return Err(AspError::NullifierAlreadySpent(
+                result.nullifier_hash.clone(),
+            ));
         }
     }
 
@@ -121,16 +165,27 @@ pub async fn shielded_mint(
     drop(relayer);
 
     // 8. Record nullifiers as spent
-    state.db.insert_nullifier(&input0.nullifier_hash, "mint", Some(&tx_hash))?;
-    state.db.insert_nullifier(&input1.nullifier_hash, "mint", Some(&tx_hash))?;
+    state
+        .db
+        .insert_nullifier(&input0.nullifier_hash, "mint", Some(&tx_hash))?;
+    state
+        .db
+        .insert_nullifier(&input1.nullifier_hash, "mint", Some(&tx_hash))?;
+
+    // Extract circuit output signals:
+    // Mint public signal order: [changeCommitment0, changeCommitment1, root, nH0, nH1, positionCommitment, tickLower, tickUpper]
+    let ps = &proof_result.public_signals;
+    let change_commitment_0 = ps.first().cloned().unwrap_or_default();
+    let change_commitment_1 = ps.get(1).cloned().unwrap_or_default();
+    let position_commitment = ps.get(5).cloned().unwrap_or_default();
 
     tracing::info!(tx_hash = %tx_hash, "Shielded mint confirmed");
 
     Ok(Json(MintResponse {
         status: "confirmed".to_string(),
         tx_hash,
-        position_commitment: "pending_sync".to_string(),
-        change_commitment_0: "pending_sync".to_string(),
-        change_commitment_1: "pending_sync".to_string(),
+        position_commitment,
+        change_commitment_0,
+        change_commitment_1,
     }))
 }

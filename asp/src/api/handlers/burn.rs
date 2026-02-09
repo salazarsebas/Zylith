@@ -4,15 +4,50 @@ use axum::extract::State;
 use axum::Json;
 
 use crate::api::types::{BurnRequest, BurnResponse};
+use crate::api::validation::{
+    validate_address, validate_decimal, validate_secret, validate_tick_range,
+};
 use crate::error::AspError;
 use crate::AppState;
 
 const TICK_OFFSET: i32 = 887272;
 
+fn validate_burn_request(req: &BurnRequest) -> Result<(), AspError> {
+    // Position note
+    validate_secret(&req.position_note.secret, "position_note.secret")?;
+    validate_secret(&req.position_note.nullifier, "position_note.nullifier")?;
+    validate_decimal(&req.position_note.liquidity, "position_note.liquidity")?;
+    validate_tick_range(req.position_note.tick_lower, req.position_note.tick_upper)?;
+
+    // Output notes
+    for (prefix, note) in [
+        ("output_note_0", &req.output_note_0),
+        ("output_note_1", &req.output_note_1),
+    ] {
+        validate_secret(&note.secret, &format!("{prefix}.secret"))?;
+        validate_secret(&note.nullifier, &format!("{prefix}.nullifier"))?;
+        validate_decimal(&note.amount_low, &format!("{prefix}.amount_low"))?;
+        validate_decimal(&note.amount_high, &format!("{prefix}.amount_high"))?;
+        validate_address(&note.token, &format!("{prefix}.token"))?;
+    }
+
+    // Pool key
+    validate_address(&req.pool_key.token_0, "pool_key.token_0")?;
+    validate_address(&req.pool_key.token_1, "pool_key.token_1")?;
+
+    if req.liquidity == 0 {
+        return Err(AspError::InvalidInput("liquidity must be > 0".into()));
+    }
+
+    Ok(())
+}
+
 pub async fn shielded_burn(
     State(state): State<Arc<AppState>>,
     Json(req): Json<BurnRequest>,
 ) -> Result<Json<BurnResponse>, AspError> {
+    validate_burn_request(&req)?;
+
     tracing::info!(
         leaf_index = req.position_note.leaf_index,
         "Processing shielded burn"

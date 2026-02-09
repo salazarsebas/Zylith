@@ -25,18 +25,19 @@ impl Database {
         commitment: &str,
         deposit_tx: Option<&str>,
     ) -> Result<(), AspError> {
-        let conn = self.conn();
+        let conn = self.conn()?;
         conn.execute(
-            "INSERT INTO commitments (leaf_index, commitment, deposit_tx) VALUES (?1, ?2, ?3)",
+            "INSERT OR IGNORE INTO commitments (leaf_index, commitment, deposit_tx) VALUES (?1, ?2, ?3)",
             rusqlite::params![leaf_index, commitment, deposit_tx],
         )?;
         Ok(())
     }
 
     pub fn get_commitment(&self, leaf_index: u32) -> Result<Option<CommitmentRow>, AspError> {
-        let conn = self.conn();
-        let mut stmt =
-            conn.prepare("SELECT leaf_index, commitment, deposit_tx FROM commitments WHERE leaf_index = ?1")?;
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT leaf_index, commitment, deposit_tx FROM commitments WHERE leaf_index = ?1",
+        )?;
         let mut rows = stmt.query_map(rusqlite::params![leaf_index], |row| {
             Ok(CommitmentRow {
                 leaf_index: row.get(0)?,
@@ -51,7 +52,7 @@ impl Database {
     }
 
     pub fn get_all_commitments(&self) -> Result<Vec<CommitmentRow>, AspError> {
-        let conn = self.conn();
+        let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT leaf_index, commitment, deposit_tx FROM commitments ORDER BY leaf_index ASC",
         )?;
@@ -68,7 +69,7 @@ impl Database {
     }
 
     pub fn get_leaf_count(&self) -> Result<u32, AspError> {
-        let conn = self.conn();
+        let conn = self.conn()?;
         let count: u32 =
             conn.query_row("SELECT COUNT(*) FROM commitments", [], |row| row.get(0))?;
         Ok(count)
@@ -82,7 +83,7 @@ impl Database {
         leaf_count: u32,
         submit_tx: Option<&str>,
     ) -> Result<(), AspError> {
-        let conn = self.conn();
+        let conn = self.conn()?;
         conn.execute(
             "INSERT INTO merkle_roots (root, leaf_count, submit_tx) VALUES (?1, ?2, ?3)",
             rusqlite::params![root, leaf_count, submit_tx],
@@ -91,7 +92,7 @@ impl Database {
     }
 
     pub fn get_latest_root(&self) -> Result<Option<String>, AspError> {
-        let conn = self.conn();
+        let conn = self.conn()?;
         let result: Result<String, _> = conn.query_row(
             "SELECT root FROM merkle_roots ORDER BY id DESC LIMIT 1",
             [],
@@ -112,16 +113,16 @@ impl Database {
         circuit_type: &str,
         tx_hash: Option<&str>,
     ) -> Result<(), AspError> {
-        let conn = self.conn();
+        let conn = self.conn()?;
         conn.execute(
-            "INSERT INTO nullifiers (nullifier_hash, circuit_type, tx_hash) VALUES (?1, ?2, ?3)",
+            "INSERT OR IGNORE INTO nullifiers (nullifier_hash, circuit_type, tx_hash) VALUES (?1, ?2, ?3)",
             rusqlite::params![nullifier_hash, circuit_type, tx_hash],
         )?;
         Ok(())
     }
 
     pub fn is_nullifier_spent(&self, nullifier_hash: &str) -> Result<bool, AspError> {
-        let conn = self.conn();
+        let conn = self.conn()?;
         let count: u32 = conn.query_row(
             "SELECT COUNT(*) FROM nullifiers WHERE nullifier_hash = ?1",
             rusqlite::params![nullifier_hash],
@@ -131,7 +132,7 @@ impl Database {
     }
 
     pub fn get_nullifier(&self, nullifier_hash: &str) -> Result<Option<NullifierRow>, AspError> {
-        let conn = self.conn();
+        let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT nullifier_hash, circuit_type, tx_hash FROM nullifiers WHERE nullifier_hash = ?1",
         )?;
@@ -151,7 +152,7 @@ impl Database {
     // --- Sync State ---
 
     pub fn get_sync_state(&self, key: &str) -> Result<Option<String>, AspError> {
-        let conn = self.conn();
+        let conn = self.conn()?;
         let result: Result<String, _> = conn.query_row(
             "SELECT value FROM sync_state WHERE key = ?1",
             rusqlite::params![key],
@@ -165,11 +166,21 @@ impl Database {
     }
 
     pub fn set_sync_state(&self, key: &str, value: &str) -> Result<(), AspError> {
-        let conn = self.conn();
+        let conn = self.conn()?;
         conn.execute(
             "INSERT OR REPLACE INTO sync_state (key, value) VALUES (?1, ?2)",
             rusqlite::params![key, value],
         )?;
         Ok(())
+    }
+
+    /// Simple health check — verifies the database is accessible.
+    pub fn is_healthy(&self) -> bool {
+        self.conn()
+            .and_then(|c| {
+                c.query_row("SELECT 1", [], |_| Ok(()))
+                    .map_err(|e| e.into())
+            })
+            .is_ok()
     }
 }

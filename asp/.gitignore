@@ -1,0 +1,9 @@
+target/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+.env.local
+keystore.json
+worker/node_modules/

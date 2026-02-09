@@ -17,7 +17,7 @@ impl Database {
     }
 
     pub fn run_migrations(&self) -> Result<(), AspError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn()?;
 
         conn.execute_batch(
             "
@@ -63,7 +63,9 @@ impl Database {
         Ok(())
     }
 
-    pub fn conn(&self) -> std::sync::MutexGuard<'_, Connection> {
-        self.conn.lock().unwrap()
+    pub fn conn(&self) -> Result<std::sync::MutexGuard<'_, Connection>, AspError> {
+        self.conn
+            .lock()
+            .map_err(|_| AspError::Internal("Database lock poisoned".into()))
     }
 }

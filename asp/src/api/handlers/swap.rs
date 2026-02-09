@@ -4,16 +4,52 @@ use axum::extract::State;
 use axum::Json;
 
 use crate::api::types::{SwapRequest, SwapResponse};
+use crate::api::validation::{
+    validate_address, validate_decimal, validate_hex_u256, validate_secret,
+};
 use crate::error::AspError;
 use crate::AppState;
+
+fn validate_swap_request(req: &SwapRequest) -> Result<(), AspError> {
+    // Input note
+    validate_secret(&req.input_note.secret, "input_note.secret")?;
+    validate_secret(&req.input_note.nullifier, "input_note.nullifier")?;
+    validate_decimal(&req.input_note.balance_low, "input_note.balance_low")?;
+    validate_decimal(&req.input_note.balance_high, "input_note.balance_high")?;
+    validate_address(&req.input_note.token, "input_note.token")?;
+
+    // Swap params
+    validate_decimal(&req.swap_params.token_in, "swap_params.token_in")?;
+    validate_decimal(&req.swap_params.token_out, "swap_params.token_out")?;
+    validate_decimal(&req.swap_params.amount_in, "swap_params.amount_in")?;
+    validate_decimal(&req.swap_params.amount_out_min, "swap_params.amount_out_min")?;
+    validate_decimal(&req.swap_params.amount_out_low, "swap_params.amount_out_low")?;
+    validate_decimal(&req.swap_params.amount_out_high, "swap_params.amount_out_high")?;
+
+    // Output + change notes
+    validate_secret(&req.output_note.secret, "output_note.secret")?;
+    validate_secret(&req.output_note.nullifier, "output_note.nullifier")?;
+    validate_secret(&req.change_note.secret, "change_note.secret")?;
+    validate_secret(&req.change_note.nullifier, "change_note.nullifier")?;
+
+    // Pool key
+    validate_address(&req.pool_key.token_0, "pool_key.token_0")?;
+    validate_address(&req.pool_key.token_1, "pool_key.token_1")?;
+
+    // Price limit
+    validate_hex_u256(&req.sqrt_price_limit, "sqrt_price_limit")?;
+
+    Ok(())
+}
 
 pub async fn shielded_swap(
     State(state): State<Arc<AppState>>,
     Json(req): Json<SwapRequest>,
 ) -> Result<Json<SwapResponse>, AspError> {
+    validate_swap_request(&req)?;
+
     tracing::info!(
         leaf_index = req.input_note.leaf_index,
-        amount_in = %req.swap_params.amount_in,
         "Processing shielded swap"
     );
 
@@ -93,11 +129,17 @@ pub async fn shielded_swap(
     drop(relayer);
 
     // 9. Record nullifier as spent
-    state.db.insert_nullifier(
-        &input_result.nullifier_hash,
-        "swap",
-        Some(&tx_hash),
-    )?;
+    state
+        .db
+        .insert_nullifier(&input_result.nullifier_hash, "swap", Some(&tx_hash))?;
+
+    // The changeCommitment is a circuit output computed inside the proof.
+    // It's the first public signal from the swap circuit (Circom outputs come first).
+    let change_commitment = proof_result
+        .public_signals
+        .first()
+        .cloned()
+        .unwrap_or_default();
 
     tracing::info!(tx_hash = %tx_hash, "Shielded swap confirmed");
 
@@ -105,6 +147,6 @@ pub async fn shielded_swap(
         status: "confirmed".to_string(),
         tx_hash,
         new_commitment: output_commitment.commitment,
-        change_commitment: "pending_sync".to_string(), // Will be populated via event sync
+        change_commitment,
     }))
 }

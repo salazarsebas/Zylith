@@ -4,6 +4,7 @@ use axum::extract::State;
 use axum::Json;
 
 use crate::api::types::{WithdrawRequest, WithdrawResponse};
+use crate::api::validation::{validate_address, validate_decimal, validate_secret};
 use crate::error::AspError;
 use crate::AppState;
 
@@ -11,6 +12,13 @@ pub async fn withdraw(
     State(state): State<Arc<AppState>>,
     Json(req): Json<WithdrawRequest>,
 ) -> Result<Json<WithdrawResponse>, AspError> {
+    // Validate
+    validate_secret(&req.secret, "secret")?;
+    validate_secret(&req.nullifier, "nullifier")?;
+    validate_decimal(&req.amount_low, "amount_low")?;
+    validate_decimal(&req.amount_high, "amount_high")?;
+    validate_address(&req.token, "token")?;
+
     tracing::info!(leaf_index = req.leaf_index, "Processing withdrawal (membership proof)");
 
     // 1. Compute commitment to verify it exists at leaf_index
@@ -73,7 +81,6 @@ pub async fn withdraw(
 
     tracing::info!(
         tx_hash = %tx_hash,
-        nullifier_hash = %commitment_result.nullifier_hash,
         "Withdrawal confirmed"
     );
 

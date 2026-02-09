@@ -197,6 +197,7 @@ pub struct StatusResponse {
     pub healthy: bool,
     pub version: String,
     pub tree: TreeStatus,
+    pub sync: SyncStatus,
     pub contracts: ContractAddresses,
 }
 
@@ -204,6 +205,11 @@ pub struct StatusResponse {
 pub struct TreeStatus {
     pub leaf_count: u32,
     pub root: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SyncStatus {
+    pub last_synced_block: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]

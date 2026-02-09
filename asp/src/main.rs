@@ -70,6 +70,13 @@ async fn main() -> anyhow::Result<()> {
         relayer: Mutex::new(relayer),
     });
 
+    // Spawn event sync background task
+    let sync_state = state.clone();
+    let poll_interval = config.sync_poll_interval_secs;
+    tokio::spawn(async move {
+        sync::events::start_event_sync(sync_state, poll_interval).await;
+    });
+
     // Build router
     let app = api::routes::create_router(state.clone());
 

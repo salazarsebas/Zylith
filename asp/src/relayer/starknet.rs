@@ -238,6 +238,10 @@ impl StarknetRelayer {
     pub fn pool_address(&self) -> &Felt {
         &self.pool_address
     }
+
+    pub fn provider(&self) -> &JsonRpcClient<HttpTransport> {
+        self.account.provider()
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

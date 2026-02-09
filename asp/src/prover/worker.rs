@@ -194,6 +194,25 @@ impl Worker {
             .map(|s| s.to_string())
             .ok_or_else(|| AspError::ProverError("Missing root in insert_leaf response".into()))
     }
+
+    /// Get the current tree root without modifying the tree.
+    pub async fn get_root(&mut self) -> Result<String, AspError> {
+        let data = self
+            .send_command("get_root", serde_json::json!({}))
+            .await?;
+        data["root"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| AspError::ProverError("Missing root in get_root response".into()))
+    }
+
+    /// Send a ping to check if the worker process is alive.
+    pub async fn ping(&mut self) -> Result<bool, AspError> {
+        let data = self
+            .send_command("ping", serde_json::json!({}))
+            .await?;
+        Ok(data["pong"].as_bool().unwrap_or(false))
+    }
 }
 
 #[derive(Debug, Deserialize)]

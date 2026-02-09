@@ -26,6 +26,9 @@ pub struct Config {
 
     // Worker
     pub worker_path: String,
+
+    // Sync
+    pub sync_poll_interval_secs: u64,
 }
 
 #[derive(Deserialize)]
@@ -88,6 +91,11 @@ impl Config {
             path.to_string_lossy().to_string()
         });
 
+        let sync_poll_interval_secs: u64 = std::env::var("SYNC_POLL_INTERVAL_SECS")
+            .unwrap_or_else(|_| "5".to_string())
+            .parse()
+            .unwrap_or(5);
+
         Ok(Config {
             host,
             port,
@@ -99,6 +107,7 @@ impl Config {
             pool_address,
             database_path,
             worker_path,
+            sync_poll_interval_secs,
         })
     }
 }

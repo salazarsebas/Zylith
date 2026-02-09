@@ -1,5 +1,5 @@
 /**
- * Zylith ASP Node.js Worker
+ * Zylith ASP Worker
  *
  * Long-lived Bun process that communicates with the Rust ASP server via NDJSON
  * over stdin/stdout. Handles Merkle tree operations, commitment computation,
@@ -9,9 +9,19 @@
  */
 import { createInterface } from "readline";
 import { MerkleTree } from "../../circuits/scripts/lib/merkle.mjs";
-import { computeCommitment, computePositionCommitment } from "../../circuits/scripts/lib/commitment.mjs";
-import { generateProof, exportProofArtifacts } from "../../circuits/scripts/lib/prover.mjs";
-import { generateCalldata, isGaragaAvailable } from "../../circuits/scripts/lib/garaga.mjs";
+import {
+  computeCommitment,
+  computePositionCommitment,
+} from "../../circuits/scripts/lib/commitment.mjs";
+import {
+  generateProof,
+  exportProofArtifacts,
+} from "../../circuits/scripts/lib/prover.mjs";
+import {
+  generateCalldata,
+  isGaragaAvailable,
+} from "../../circuits/scripts/lib/garaga.mjs";
+import { initPoseidon } from "../../circuits/scripts/lib/poseidon.mjs";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -46,6 +56,12 @@ async function handleCommand(msg) {
 
       case "insert_leaf": {
         tree.insert(String(params.leaf));
+        const root = tree.getRoot();
+        respond({ id, ok: true, data: { root } });
+        break;
+      }
+
+      case "get_root": {
         const root = tree.getRoot();
         respond({ id, ok: true, data: { root } });
         break;
@@ -113,7 +129,11 @@ async function handleCommand(msg) {
         );
 
         if (!verified) {
-          respond({ id, ok: false, error: `Local verification failed for ${circuit}` });
+          respond({
+            id,
+            ok: false,
+            error: `Local verification failed for ${circuit}`,
+          });
           return;
         }
 
@@ -128,7 +148,11 @@ async function handleCommand(msg) {
 
         const calldataGenerated = generateCalldata(circuit);
         if (!calldataGenerated) {
-          respond({ id, ok: false, error: `garaga calldata generation failed for ${circuit}` });
+          respond({
+            id,
+            ok: false,
+            error: `garaga calldata generation failed for ${circuit}`,
+          });
           return;
         }
 
@@ -140,7 +164,10 @@ async function handleCommand(msg) {
           "proof_calldata.txt",
         );
         const calldataRaw = fs.readFileSync(calldataPath, "utf8").trim();
-        const calldata = calldataRaw.split("\n").map((line) => line.trim()).filter(Boolean);
+        const calldata = calldataRaw
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean);
 
         respond({
           id,
@@ -153,6 +180,11 @@ async function handleCommand(msg) {
         break;
       }
 
+      case "ping": {
+        respond({ id, ok: true, data: { pong: true } });
+        break;
+      }
+
       default:
         respond({ id, ok: false, error: `Unknown command: ${command}` });
     }
@@ -161,22 +193,29 @@ async function handleCommand(msg) {
   }
 }
 
-// Main: read NDJSON from stdin
-const rl = createInterface({ input: process.stdin });
+// Main: initialize Poseidon, then start reading NDJSON from stdin
+(async () => {
+  await initPoseidon();
 
-// Send ready signal
-respond({ ready: true });
+  const rl = createInterface({ input: process.stdin });
 
-rl.on("line", async (line) => {
-  try {
-    const msg = JSON.parse(line);
-    await handleCommand(msg);
-  } catch (err) {
-    // If we can't parse the message, send a generic error
-    respond({ id: "unknown", ok: false, error: `Parse error: ${err.message}` });
-  }
-});
+  // Send ready signal AFTER Poseidon is initialized
+  respond({ ready: true });
 
-rl.on("close", () => {
-  process.exit(0);
-});
+  rl.on("line", async (line) => {
+    try {
+      const msg = JSON.parse(line);
+      await handleCommand(msg);
+    } catch (err) {
+      respond({
+        id: "unknown",
+        ok: false,
+        error: `Parse error: ${err.message}`,
+      });
+    }
+  });
+
+  rl.on("close", () => {
+    process.exit(0);
+  });
+})();
