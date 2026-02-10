@@ -1,0 +1,50 @@
+{
+  "name": "@zylith/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Zylith shielded CLMM on Starknet",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "artifacts"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "copy-artifacts": "cp -r ../circuits/build/membership ../circuits/build/swap ../circuits/build/mint ../circuits/build/burn artifacts/ 2>/dev/null || echo 'No circuit artifacts found'",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": [
+    "zylith",
+    "starknet",
+    "privacy",
+    "zk-snarks",
+    "clmm",
+    "defi"
+  ],
+  "author": "Zylith Protocol",
+  "license": "MIT",
+  "dependencies": {
+    "circomlibjs": "^0.1.7",
+    "snarkjs": "^0.7.0",
+    "starknet": "^6.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/snarkjs": "^0.7.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
