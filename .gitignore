@@ -1,5 +1,6 @@
 # Build artifacts
 target/
+dist/
 
 # Scarb lock file (optional - remove if you want reproducible builds)
 Scarb.lock

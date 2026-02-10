@@ -2,6 +2,7 @@
   "name": "zylith",
   "version": "0.1.0",
   "description": "Shielded CLMM for Bitcoin on Starknet",
+  "workspaces": ["sdk", "frontend"],
   "scripts": {
     "build": "bun run build:cairo && bun run build:circuits",
     "build:cairo": "scarb build",
