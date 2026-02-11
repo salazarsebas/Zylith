@@ -27,16 +27,19 @@
 
 ## Overview
 
-**Zylith** is a shielded Concentrated Liquidity Market Maker (CLMM) built for Bitcoin DeFi on Starknet. It combines the capital efficiency of concentrated liquidity (inspired by Ekubo) with privacy-preserving technology using zero-knowledge proofs.
+**Zylith** is the first privacy-native Concentrated Liquidity Market Maker (CLMM) built for Bitcoin DeFi on Starknet. Every swap, mint, and burn is shielded by default through zero-knowledge proofs — no opt-in required, no metadata leaks.
+
+Zylith delivers the capital efficiency of concentrated liquidity with a privacy layer that existing DEXs cannot offer: positions are hidden behind commitments, trade amounts are verified without being revealed, and LP ownership is decoupled from on-chain addresses.
 
 ### Why Zylith?
 
-| Traditional AMM | Zylith |
-|-----------------|--------|
-| Public positions | Shielded positions via commitments |
-| Visible swap amounts | Private swap verification |
-| Address-linked LP | Commitment-based LP ownership |
-| Limited to ERC20 | Native Bitcoin support (tBTC, WBTC, LBTC) |
+| Existing DEXs | Zylith |
+|---------------|--------|
+| Public positions visible to everyone | Shielded positions via Poseidon commitments |
+| Swap amounts leaked on-chain | Private swap verification with ZK proofs |
+| LP ownership tied to addresses | Commitment-based ownership (unlinkable) |
+| Privacy as afterthought | **Privacy by default** |
+| No native Bitcoin focus | First-class Bitcoin pools (tBTC, WBTC, LBTC) |
 
 > Built for the [RE{DEFINE} Hackathon](https://dorahacks.io/hackathon/redefine) - Starknet's Bitcoin & Privacy Hackathon 2026
 
@@ -51,10 +54,10 @@
 - **ZK Verification**: Groth16 proofs via Garaga
 
 ### CLMM Engine
-- **Concentrated Liquidity**: Ekubo-style 128.128 sqrt price math
-- **Tick Management**: Bitmap-based tick navigation
-- **Fee Accounting**: Protocol fees with withdrawal-fee on burns
-- **Precise Arithmetic**: u128 liquidity/fee calculations
+- **Concentrated Liquidity**: Full-range and narrow tick positions with Q128.128 precision
+- **Tick Management**: Bitmap-based tick navigation for gas-efficient traversal
+- **Fee Accounting**: Per-position fee growth tracking with protocol fee capture
+- **Precise Arithmetic**: u128/u256 wide arithmetic — no precision loss at any scale
 
 ### Bitcoin Integration
 - **Multi-Token Support**: tBTC, WBTC, LBTC
@@ -298,7 +301,7 @@ zylith/
 
 ### CLMM Engine
 
-The CLMM layer implements concentrated liquidity mechanics inspired by Ekubo:
+The CLMM engine implements full concentrated liquidity mechanics with Q128.128 fixed-point precision:
 
 **Pool State**
 ```cairo
@@ -575,7 +578,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - [Starknet Foundation](https://www.starknet.io/) - For the RE{DEFINE} Hackathon
-- [Ekubo Protocol](https://www.ekubo.org/) - CLMM reference implementation
+- [Ekubo Protocol](https://www.ekubo.org/) - Concentrated liquidity on Starknet
 - [Privacy Pools](https://docs.privacypools.com/) - Privacy architecture inspiration
 - [Garaga](https://github.com/keep-starknet-strange/garaga) - ZK verification toolkit
 - [OpenZeppelin](https://www.openzeppelin.com/) - Secure contract patterns
