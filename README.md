@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/Cairo-2.13+-orange?style=flat-square" alt="Cairo"/></a>
-  <a href="#"><img src="https://img.shields.io/badge/Starknet-Mainnet-blue?style=flat-square" alt="Starknet"/></a>
+  <a href="#"><img src="https://img.shields.io/badge/Cairo-2.9.1-orange?style=flat-square" alt="Cairo"/></a>
+  <a href="#"><img src="https://img.shields.io/badge/Starknet-Sepolia-blue?style=flat-square" alt="Starknet"/></a>
   <a href="#"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"/></a>
   <a href="https://dorahacks.io/hackathon/redefine"><img src="https://img.shields.io/badge/RE%7BDEFINE%7D-Hackathon-purple?style=flat-square" alt="Hackathon"/></a>
 </p>
@@ -148,19 +148,27 @@ flowchart TB
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| [Cairo](https://www.cairo-lang.org/) | 2.13.1+ | Smart contract language |
-| [Scarb](https://docs.swmansion.com/scarb/) | 2.13.1+ | Package manager & build tool |
-| [Starknet Foundry](https://github.com/foundry-rs/starknet-foundry) | 0.51.1+ | Testing framework |
-| [Starkli](https://github.com/xJonathanLEI/starkli) | Latest | CLI for Starknet |
+| [Cairo](https://www.cairo-lang.org/) | 2.9.1 | Smart contract language |
+| [Scarb](https://docs.swmansion.com/scarb/) | 2.15.1 | Package manager & build tool |
+| [Starknet Foundry](https://github.com/foundry-rs/starknet-foundry) | 0.55.0 | Testing framework |
+| [Starkli](https://github.com/xJonathanLEI/starkli) | 0.4.x | CLI for Starknet |
 
 ### ZK/Privacy Stack
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| [Garaga](https://github.com/keep-starknet-strange/garaga) | Latest | Groth16 verification on Starknet |
+| [Garaga](https://github.com/keep-starknet-strange/garaga) | 1.0.1 | Groth16 verification on Starknet |
 | [Circom](https://docs.circom.io/) | 2.x | ZK circuit development |
-| [snarkjs](https://github.com/iden3/snarkjs) | Latest | Proof generation |
-| Python | 3.10 | Garaga SDK requirement |
+| [snarkjs](https://github.com/iden3/snarkjs) | 0.7.x | Proof generation |
+| Python | 3.10+ | Garaga CLI requirement |
+
+### Backend & SDK
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Rust | 1.75+ | ASP server runtime |
+| Bun / Node.js | 18+ | Proof worker, SDK, frontend |
+| TypeScript | 5.6+ | SDK & frontend |
 
 ### Libraries
 
@@ -228,76 +236,59 @@ scarb fmt
 
 ```
 zylith/
-├── src/
+├── src/                              # Cairo smart contracts
+│   ├── pool/
+│   │   └── contract.cairo            # ZylithPool singleton (CLMM + shielded ops)
 │   ├── clmm/
 │   │   ├── math/
-│   │   │   ├── sqrt_price.cairo      # 128.128 sqrt price math
-│   │   │   ├── tick_math.cairo       # Tick calculations
-│   │   │   └── liquidity.cairo       # Liquidity math
-│   │   ├── pool.cairo                # Pool state management
-│   │   ├── swap.cairo                # Swap engine
+│   │   │   ├── sqrt_price.cairo      # Q128.128 sqrt price math
+│   │   │   ├── tick_math.cairo       # Tick ↔ price conversions
+│   │   │   └── liquidity.cairo       # Liquidity delta math
+│   │   ├── swap.cairo                # Swap engine (compute_swap_step)
 │   │   ├── positions.cairo           # LP position management
-│   │   ├── tick_bitmap.cairo         # Tick bitmap operations
-│   │   └── fees.cairo                # Fee accounting
-│   │
+│   │   ├── tick_bitmap.cairo         # Bitmap-based tick navigation
+│   │   └── fees.cairo                # Fee growth accounting
 │   ├── privacy/
 │   │   ├── notes.cairo               # Shielded note structures
-│   │   ├── merkle.cairo              # Merkle tree component
+│   │   ├── merkle.cairo              # Incremental Merkle tree (height 20)
 │   │   ├── nullifier.cairo           # Nullifier registry
 │   │   └── commitment.cairo          # Commitment utilities
-│   │
 │   ├── verifier/
-│   │   ├── types.cairo               # Proof and public input types
-│   │   ├── membership_verifier.cairo # Membership proof verifier
-│   │   ├── swap_verifier.cairo       # Swap proof verifier
-│   │   ├── mint_verifier.cairo       # LP mint proof verifier
-│   │   ├── burn_verifier.cairo       # LP burn proof verifier
-│   │   └── coordinator.cairo         # Central verification coordinator
-│   │
-│   ├── interfaces/
-│   │   ├── pool.cairo                # IZylithPool
-│   │   ├── erc20.cairo               # IERC20
-│   │   ├── verifier.cairo            # IVerifier trait
-│   │   └── coordinator.cairo         # IVerifierCoordinator trait
-│   │
-│   └── lib.cairo                     # Library exports
+│   │   ├── coordinator.cairo         # VerifierCoordinator contract (ZK proofs + Merkle)
+│   │   └── types.cairo               # Proof structs and public input extraction
+│   ├── interfaces/                   # Trait definitions (IZylithPool, IVerifierCoordinator, etc.)
+│   ├── types.cairo                   # Shared types (PoolKey, PoolState, TickInfo, etc.)
+│   └── tests/                        # Integration tests (mock_erc20, mock_coordinator, test_pool)
 │
-├── circuits/
+├── circuits/                         # Circom ZK circuits
 │   ├── membership.circom             # Merkle membership proof
 │   ├── swap.circom                   # Private swap verification
-│   ├── liquidity.circom              # LP templates (PrivateMint, PrivateBurn)
-│   ├── mint.circom                   # PrivateMint entry point
-│   ├── burn.circom                   # PrivateBurn entry point
-│   ├── common/
-│   │   ├── commitment.circom         # Zylith commitment scheme
-│   │   ├── poseidon.circom           # Poseidon hash
-│   │   └── merkle.circom             # Merkle proof helper
-│   └── scripts/
-│       ├── compile_circuits.sh       # Circom compilation
-│       ├── setup.sh                  # Trusted setup
-│       └── generate_verifiers.sh     # Garaga verifier generation
+│   ├── liquidity.circom              # PrivateMint / PrivateBurn templates
+│   ├── mint.circom / burn.circom     # Entry points
+│   ├── common/                       # Shared templates (commitment, merkle, poseidon)
+│   └── scripts/                      # Compilation, setup, proof generation
 │
-├── asp/
-│   ├── src/
-│   │   ├── main.rs                   # ASP server entry
-│   │   ├── merkle.rs                 # Merkle tree replica
-│   │   └── api.rs                    # REST API endpoints
-│   └── Cargo.toml
+├── garaga_verifiers/                 # Auto-generated Groth16 BN254 verifiers (scarb 2.14.0)
+│   ├── membership_verifier/
+│   ├── swap_verifier/
+│   ├── mint_verifier/
+│   └── burn_verifier/
 │
-├── tests/
-│   ├── test_swap.cairo
-│   ├── test_liquidity.cairo
-│   ├── test_privacy.cairo
-│   └── test_integration.cairo
+├── asp/                              # Anonymous Service Provider (Rust + Bun worker)
+│   ├── src/                          # Axum server, SQLite, Starknet relayer
+│   └── worker/                       # Node.js proof generation worker
+│
+├── sdk/                              # @zylith/sdk TypeScript client SDK
+│   └── src/                          # Client, ASP HTTP client, crypto, prover, Starknet readers
+│
+├── frontend/                         # React web application
+│   └── src/                          # Vite + React + TailwindCSS
 │
 ├── scripts/
-│   ├── deploy.sh                     # Deployment script
-│   └── generate_verifier.sh          # Garaga verifier generation
+│   ├── deploy.sh                     # Starknet Sepolia deployment
+│   └── validate_testnet.mjs          # End-to-end testnet validation
 │
-├── assets/
-│   └── Zylith.png                    # Logo
-│
-├── Scarb.toml                        # Cairo package config
+├── Scarb.toml                        # Cairo package config (starknet 2.9.1, scarb 2.15.1)
 └── README.md
 ```
 
@@ -346,10 +337,10 @@ commitment = Poseidon(
 ```
 
 **Merkle Tree**
-- Height: 25 (2^24 leaves)
-- Hash: Poseidon
-- Incremental updates
-- Historical root storage (last N roots)
+- Height: 20 (~1M leaves)
+- Hash: BN128 Poseidon (off-chain) / admin root submission (on-chain)
+- Incremental updates via ASP
+- Historical root storage
 
 ### Verifier Integration
 
@@ -419,8 +410,8 @@ template PrivateSwap() {
     signal input secret;
     signal input nullifier;
     signal input amount_in;
-    signal input pathElements[24];
-    signal input pathIndices[24];
+    signal input pathElements[20];
+    signal input pathIndices[20];
 
     // Public inputs
     signal input root;
@@ -429,7 +420,7 @@ template PrivateSwap() {
     signal input sqrt_price_after;
 
     // Verify note ownership
-    component membership = Membership(24);
+    component membership = Membership(20);
 
     // Verify swap math
     component swap = SwapMath();
@@ -476,21 +467,20 @@ snforge test --filter integration
 
 1. **Configure environment**
 ```bash
-export STARKNET_RPC="https://starknet-sepolia.public.blastapi.io"
-export STARKNET_ACCOUNT="~/.starkli-wallets/deployer/account.json"
-export STARKNET_KEYSTORE="~/.starkli-wallets/deployer/keystore.json"
+cp .env.example .env.local
+# Edit .env.local with your RPC URL, account, keystore, and password
 ```
 
-2. **Deploy contracts**
+2. **Build & deploy**
 ```bash
-./scripts/deploy.sh testnet
+# Build contracts (release profile for smaller Sierra)
+SCARB_PROFILE=release scarb build
+
+# Deploy all contracts (verifiers, coordinator, pool)
+bash scripts/deploy.sh
 ```
 
-### Mainnet
-
-```bash
-./scripts/deploy.sh mainnet
-```
+Deployed addresses are written to `scripts/deployed_addresses.json`.
 
 ---
 
@@ -500,11 +490,14 @@ export STARKNET_KEYSTORE="~/.starkli-wallets/deployer/keystore.json"
 - [x] Project setup & architecture
 - [x] CLMM core (swap, liquidity, fees)
 - [x] Privacy layer (notes, Merkle tree, nullifiers)
-- [x] Circom circuits (membership, swap, liquidity)
+- [x] Circom circuits (membership, swap, mint, burn)
 - [x] Garaga verifier integration
-- [ ] ASP server
-- [ ] Basic test coverage
-- [ ] Testnet deployment
+- [x] ASP server (Rust + Bun worker)
+- [x] TypeScript SDK (`@zylith/sdk`)
+- [x] Frontend web application
+- [x] Test suite (70 Cairo tests + 42 ASP E2E tests + SDK unit tests)
+- [x] Testnet deployment (Starknet Sepolia)
+- [x] End-to-end proof verification on-chain
 
 ### Post-Hackathon
 - [ ] Private multi-hop routing
