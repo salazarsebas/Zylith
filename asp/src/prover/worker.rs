@@ -31,8 +31,7 @@ struct WorkerResponse {
 
 impl Worker {
     pub async fn spawn(worker_path: &str) -> Result<Self, AspError> {
-        let mut child = tokio::process::Command::new("bun")
-            .arg("run")
+        let mut child = tokio::process::Command::new("node")
             .arg(worker_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -166,6 +165,28 @@ impl Worker {
         let data = self.send_command("compute_commitment", params).await?;
         let result: CommitmentResult = serde_json::from_value(data)
             .map_err(|e| AspError::ProverError(format!("Invalid commitment response: {e}")))?;
+        Ok(result)
+    }
+
+    /// Compute a position commitment and nullifier hash.
+    pub async fn compute_position_commitment(
+        &mut self,
+        secret: &str,
+        nullifier: &str,
+        tick_lower: i32,
+        tick_upper: i32,
+        liquidity: &str,
+    ) -> Result<CommitmentResult, AspError> {
+        let params = serde_json::json!({
+            "secret": secret,
+            "nullifier": nullifier,
+            "tickLower": tick_lower,
+            "tickUpper": tick_upper,
+            "liquidity": liquidity,
+        });
+        let data = self.send_command("compute_position_commitment", params).await?;
+        let result: CommitmentResult = serde_json::from_value(data)
+            .map_err(|e| AspError::ProverError(format!("Invalid position commitment response: {e}")))?;
         Ok(result)
     }
 

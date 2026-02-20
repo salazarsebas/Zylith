@@ -11,6 +11,7 @@ use starknet::ContractAddress;
 use super::commitment::{
     are_commitment_components_valid, compute_commitment, compute_nullifier_hash,
 };
+use crate::types::Tick;
 
 /// A shielded note representing a hidden deposit
 ///
@@ -87,8 +88,8 @@ pub struct PositionOpened {
     pub commitment: felt252,
     #[key]
     pub pool_key: felt252,
-    pub tick_lower: i32,
-    pub tick_upper: i32,
+    pub tick_lower: Tick,
+    pub tick_upper: Tick,
     pub liquidity: u128,
     pub timestamp: u64,
 }

@@ -37,6 +37,26 @@ export const FEE_TIERS = {
   HIGH: { fee: 10000, tickSpacing: 200 },
 } as const;
 
+/**
+ * Tick struct matching Cairo's Tick { sign: bool, mag: u32 }.
+ * Used for wallet-safe serialization of signed tick values.
+ */
+export interface Tick {
+  sign: boolean;
+  mag: number;
+}
+
+/** Convert a signed tick number to a Tick struct for contract calls */
+export function toTick(value: number): Tick {
+  return { sign: value < 0, mag: Math.abs(value) };
+}
+
+/** Convert a Tick struct from contract results to a signed number */
+export function fromTick(tick: { sign: boolean; mag: number | bigint }): number {
+  const mag = Number(tick.mag);
+  return tick.sign ? -mag : mag;
+}
+
 /** BN254 scalar field modulus (for validation) */
 export const BN254_SCALAR_FIELD =
   21888242871839275222246405745257275088548364400416034343698204186575808495617n;

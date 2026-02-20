@@ -115,11 +115,23 @@ pub async fn shielded_mint(
     let tick_lower_unsigned = (req.position.tick_lower + TICK_OFFSET) as u32;
     let tick_upper_unsigned = (req.position.tick_upper + TICK_OFFSET) as u32;
 
-    // 5. Build mint circuit inputs
+    // 5. Compute position commitment (must use unsigned ticks)
+    let position = worker
+        .compute_position_commitment(
+            &req.position.secret,
+            &req.position.nullifier,
+            tick_lower_unsigned as i32,
+            tick_upper_unsigned as i32,
+            &req.position.liquidity,
+        )
+        .await?;
+
+    // 6. Build mint circuit inputs
     let inputs = serde_json::json!({
         "root": proof0.root,
         "nullifierHash0": input0.nullifier_hash,
         "nullifierHash1": input1.nullifier_hash,
+        "positionCommitment": position.commitment,
         "tickLower": tick_lower_unsigned.to_string(),
         "tickUpper": tick_upper_unsigned.to_string(),
         // Private - input note 0
@@ -153,18 +165,21 @@ pub async fn shielded_mint(
         "changeNullifier1": req.change_note_1.nullifier,
     });
 
-    // 6. Generate mint proof
+    // 7. Generate mint proof
     let proof_result = worker.generate_proof("mint", inputs).await?;
     drop(worker);
 
-    // 7. Submit to pool.shielded_mint
-    let relayer = state.relayer.lock().await;
-    let tx_hash = relayer
-        .shielded_mint(&req.pool_key, &proof_result.calldata, req.liquidity)
-        .await?;
-    drop(relayer);
+    // 8. Submit to pool.shielded_mint
+    let tx_hash = if let Some(ref relayer) = state.relayer {
+        let relayer = relayer.lock().await;
+        relayer
+            .shielded_mint(&req.pool_key, &proof_result.calldata, req.liquidity)
+            .await?
+    } else {
+        return Err(AspError::Internal("No relayer configured".into()));
+    };
 
-    // 8. Record nullifiers as spent
+    // 9. Record nullifiers as spent
     state
         .db
         .insert_nullifier(&input0.nullifier_hash, "mint", Some(&tx_hash))?;
@@ -177,7 +192,54 @@ pub async fn shielded_mint(
     let ps = &proof_result.public_signals;
     let change_commitment_0 = ps.first().cloned().unwrap_or_default();
     let change_commitment_1 = ps.get(1).cloned().unwrap_or_default();
-    let position_commitment = ps.get(5).cloned().unwrap_or_default();
+    let position_commitment = position.commitment;
+
+    // 10. Insert change commitments and position commitment into Merkle tree
+    let mut worker = state.worker.lock().await;
+    let mut last_root = String::new();
+
+    // Insert change commitment 0 if non-zero
+    if !change_commitment_0.is_empty() && change_commitment_0 != "0" {
+        let leaf_index = state.db.get_leaf_count()?;
+        state
+            .db
+            .insert_commitment(leaf_index as u32, &change_commitment_0, Some(&tx_hash))?;
+        last_root = worker.insert_leaf(&change_commitment_0).await?;
+        tracing::debug!(leaf_index = leaf_index, "Inserted change_commitment_0");
+    }
+
+    // Insert change commitment 1 if non-zero
+    if !change_commitment_1.is_empty() && change_commitment_1 != "0" {
+        let leaf_index = state.db.get_leaf_count()?;
+        state
+            .db
+            .insert_commitment(leaf_index as u32, &change_commitment_1, Some(&tx_hash))?;
+        last_root = worker.insert_leaf(&change_commitment_1).await?;
+        tracing::debug!(leaf_index = leaf_index, "Inserted change_commitment_1");
+    }
+
+    // Insert position commitment into tree (always present)
+    let leaf_index = state.db.get_leaf_count()?;
+    state
+        .db
+        .insert_commitment(leaf_index as u32, &position_commitment, Some(&tx_hash))?;
+    last_root = worker.insert_leaf(&position_commitment).await?;
+    tracing::debug!(leaf_index = leaf_index, "Inserted position_commitment");
+
+    drop(worker);
+
+    // 11. Store the final root in DB
+    let new_count = state.db.get_leaf_count()?;
+    state.db.insert_root(&last_root, new_count as u32, Some(&tx_hash))?;
+
+    // 12. Submit the new Merkle root to Coordinator on-chain
+    if let Some(ref relayer) = state.relayer {
+        let relayer = relayer.lock().await;
+        let root_tx = relayer.submit_merkle_root(&last_root).await?;
+        tracing::info!(tx_hash = %root_tx, "Merkle root submitted on-chain after mint");
+    } else {
+        tracing::warn!("No relayer configured — root stored locally only");
+    }
 
     tracing::info!(tx_hash = %tx_hash, "Shielded mint confirmed");
 

@@ -6,6 +6,8 @@ import { u256Split } from "../utils/conversions.js";
 export interface WithdrawParams {
   /** The note to withdraw. Must have a leafIndex. */
   noteCommitment: string;
+  /** The recipient address to receive the withdrawn tokens */
+  recipient: string;
 }
 
 export interface WithdrawResult {
@@ -34,6 +36,7 @@ export async function withdraw(
     amount_low: low.toString(),
     amount_high: high.toString(),
     token: note.token,
+    recipient: params.recipient,
     leaf_index: note.leafIndex,
   });
 

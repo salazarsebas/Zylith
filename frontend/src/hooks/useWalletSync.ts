@@ -1,13 +1,12 @@
 import { useEffect } from "react";
-import { useAccount } from "@starknet-react/core";
+import { useStarknetWallet } from "@/providers/StarknetProvider";
 import { useWalletStore } from "@/stores/walletStore";
 
 /**
- * Syncs starknet-react wallet state into Zustand store.
- * Must be rendered inside StarknetConfig.
+ * Syncs Starknet wallet state into Zustand store.
  */
 export function useWalletSync() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useStarknetWallet();
   const { setWallet, clearWallet } = useWalletStore();
 
   useEffect(() => {

@@ -36,7 +36,7 @@
   "dependencies": {
     "circomlibjs": "^0.1.7",
     "snarkjs": "^0.7.0",
-    "starknet": "^6.11.0"
+    "starknet": "^9.2.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

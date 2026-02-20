@@ -7,6 +7,7 @@ use super::tick_bitmap::{next_initialized_tick_within_one_word, position};
 /// Swap engine for CLMM
 /// Implements the core swap logic with tick crossing
 use super::super::types::i256;
+use crate::types::TickTrait;
 
 /// Swap state tracked during execution
 #[derive(Copy, Drop, Serde)]
@@ -198,7 +199,7 @@ pub fn apply_tick_crossing(
         }
     }
 
-    pool_state.tick = tick;
+    pool_state.tick = TickTrait::from_i32(tick);
     pool_state
 }
 

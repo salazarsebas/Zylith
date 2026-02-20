@@ -48,9 +48,8 @@ export interface DepositRequest {
 export interface DepositResponse {
   status: string;
   leaf_index: number;
-  tx_hash: string;
+  calldata: string[]; // Calldata for user to submit via wallet
   root: string;
-  root_tx_hash: string;
 }
 
 // ============================================================================
@@ -63,6 +62,7 @@ export interface WithdrawRequest {
   amount_low: string;
   amount_high: string;
   token: string;
+  recipient: string;
   leaf_index: number;
 }
 

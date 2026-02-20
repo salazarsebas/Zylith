@@ -29,7 +29,7 @@
 /// - Public inputs are extracted from the verified proof (not user-supplied)
 
 use starknet::ContractAddress;
-use crate::verifier::types::{SwapPublicInputs, MintPublicInputs, BurnPublicInputs};
+use crate::verifier::types::{MembershipPublicInputs, SwapPublicInputs, MintPublicInputs, BurnPublicInputs};
 
 /// Coordinator interface for managing all proof verifications
 #[starknet::interface]
@@ -46,7 +46,7 @@ pub trait IVerifierCoordinator<TContractState> {
     /// * `full_proof_with_hints` - Garaga calldata blob for membership circuit
     ///
     /// # Returns
-    /// * `true` if verification succeeds
+    /// * Verified `MembershipPublicInputs` extracted from the proof
     ///
     /// # Side Effects
     /// * Marks nullifier_hash as spent
@@ -56,7 +56,7 @@ pub trait IVerifierCoordinator<TContractState> {
     /// * If root is not known
     /// * If nullifier is already spent
     /// * If proof verification fails
-    fn verify_membership(ref self: TContractState, full_proof_with_hints: Span<felt252>) -> bool;
+    fn verify_membership(ref self: TContractState, full_proof_with_hints: Span<felt252>) -> MembershipPublicInputs;
 
     /// Verify swap proof, register nullifier, add new commitments
     ///

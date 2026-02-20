@@ -13,13 +13,8 @@ sierra-replace-ids = false
 inlining-strategy = 2
 
 [dev-dependencies]
-snforge_std = "0.55.0"
+snforge_std = "0.53.0"
 assert_macros = "2.14.0"
-
-[[tool.snforge.fork]]
-name = "SEPOLIA"
-url = "$STARKNET_RPC_URL"
-block_id.tag = "latest"
 
 [[target.starknet-contract]]
 casm = true

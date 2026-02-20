@@ -20,12 +20,13 @@ include "node_modules/circomlib/circuits/comparators.circom";
  * PUBLIC INPUTS (visible on-chain):
  * - root: The Merkle root of the state tree
  * - nullifierHash: Hash of the nullifier (prevents double-spending)
+ * - recipient: Address to receive the withdrawn tokens
+ * - amount_low, amount_high: The note's amount (u256 split into u128 parts) - PUBLIC to specify withdrawal amount
+ * - token: Token contract address - PUBLIC to specify which token to withdraw
  *
  * PRIVATE INPUTS (hidden):
  * - secret: Random value known only to note owner
  * - nullifier: Unique value for this note
- * - amount_low, amount_high: The note's amount (u256 split into u128 parts)
- * - token: Token contract address
  * - pathElements: Merkle proof siblings
  * - pathIndices: Merkle proof path directions
  *
@@ -55,6 +56,10 @@ template Membership(levels) {
 
     signal input root;              // Merkle root of state tree
     signal input nullifierHash;     // Hash of nullifier (prevents double-spend)
+    signal input recipient;         // Address to receive withdrawn tokens
+    signal input amount_low;        // Low 128 bits of amount (PUBLIC for withdrawal)
+    signal input amount_high;       // High 128 bits of amount (PUBLIC for withdrawal)
+    signal input token;             // Token contract address (PUBLIC for withdrawal)
 
     //////////////////// END OF PUBLIC SIGNALS ////////////////////
 
@@ -64,9 +69,6 @@ template Membership(levels) {
     // Note components
     signal input secret;            // Random value known only to owner
     signal input nullifier;         // Unique nullifier for this note
-    signal input amount_low;        // Low 128 bits of amount
-    signal input amount_high;       // High 128 bits of amount
-    signal input token;             // Token contract address (as felt252)
 
     // Merkle proof
     signal input pathElements[levels];  // Sibling hashes
@@ -125,4 +127,4 @@ template Membership(levels) {
 }
 
 // Main component with 20 levels for Zylith's state tree
-component main {public [root, nullifierHash]} = Membership(20);
+component main {public [root, nullifierHash, recipient, amount_low, amount_high, token]} = Membership(20);

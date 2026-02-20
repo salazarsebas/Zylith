@@ -85,6 +85,19 @@ export class AspClient {
   }
 
   // ========================================================================
+  // Sync
+  // ========================================================================
+
+  async syncCommitments(
+    commitments: string[],
+  ): Promise<{ commitment: string; leaf_index: number | null }[]> {
+    const response = await this.post<{
+      commitments: { commitment: string; leaf_index: number | null }[];
+    }>("/sync-commitments", { commitments });
+    return response.commitments;
+  }
+
+  // ========================================================================
   // Internal
   // ========================================================================
 

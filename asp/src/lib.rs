@@ -17,5 +17,5 @@ pub struct AppState {
     pub config: Config,
     pub db: Database,
     pub worker: Mutex<Worker>,
-    pub relayer: Mutex<Box<dyn Relayer>>,
+    pub relayer: Option<Mutex<Box<dyn Relayer>>>,
 }

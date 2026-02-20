@@ -35,7 +35,7 @@ pub mod ZylithPool {
         align_tick_up,
     };
     use crate::clmm::math::sqrt_price::{MIN_SQRT_PRICE, MAX_SQRT_PRICE};
-    use crate::types::{i256, I256Trait};
+    use crate::types::{i256, I256Trait, Tick, TickTrait};
 
     // Interface imports
     use crate::interfaces::pool::IZylithPool;
@@ -43,7 +43,7 @@ pub mod ZylithPool {
     use crate::interfaces::coordinator::{
         IVerifierCoordinatorDispatcher, IVerifierCoordinatorDispatcherTrait,
     };
-    use crate::verifier::types::offset_tick_to_signed;
+
 
     // ========================================================================
     // CONSTANTS
@@ -88,6 +88,7 @@ pub mod ZylithPool {
         SwapExecuted: SwapExecuted,
         FeesCollected: FeesCollected,
         ProtocolFeesCollected: ProtocolFeesCollected,
+        TokensWithdrawn: TokensWithdrawn,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -98,7 +99,7 @@ pub mod ZylithPool {
         pub token_1: ContractAddress,
         pub fee: u32,
         pub sqrt_price: u256,
-        pub tick: i32,
+        pub tick: Tick,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -107,8 +108,8 @@ pub mod ZylithPool {
         pub pool_hash: felt252,
         pub sender: ContractAddress,
         pub owner: ContractAddress,
-        pub tick_lower: i32,
-        pub tick_upper: i32,
+        pub tick_lower: Tick,
+        pub tick_upper: Tick,
         pub liquidity: u128,
         pub amount_0: u256,
         pub amount_1: u256,
@@ -119,8 +120,8 @@ pub mod ZylithPool {
         #[key]
         pub pool_hash: felt252,
         pub owner: ContractAddress,
-        pub tick_lower: i32,
-        pub tick_upper: i32,
+        pub tick_lower: Tick,
+        pub tick_upper: Tick,
         pub liquidity: u128,
         pub amount_0: u256,
         pub amount_1: u256,
@@ -138,7 +139,7 @@ pub mod ZylithPool {
         pub amount_1_is_negative: bool,
         pub sqrt_price: u256,
         pub liquidity: u128,
-        pub tick: i32,
+        pub tick: Tick,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -158,6 +159,15 @@ pub mod ZylithPool {
         pub recipient: ContractAddress,
         pub amount_0: u128,
         pub amount_1: u128,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct TokensWithdrawn {
+        #[key]
+        pub recipient: ContractAddress,
+        pub token: ContractAddress,
+        pub amount: u256,
+        pub nullifier_hash: u256,
     }
 
     // ========================================================================
@@ -225,7 +235,7 @@ pub mod ZylithPool {
                         token_1: pool_key.token_1,
                         fee: pool_key.fee_tier.fee,
                         sqrt_price,
-                        tick,
+                        tick: TickTrait::from_i32(tick),
                     },
                 );
 
@@ -246,12 +256,14 @@ pub mod ZylithPool {
             self: @ContractState,
             pool_key: PoolKey,
             owner: ContractAddress,
-            tick_lower: i32,
-            tick_upper: i32,
+            tick_lower: Tick,
+            tick_upper: Tick,
         ) -> Position {
+            let tick_lower_i32 = tick_lower.to_i32();
+            let tick_upper_i32 = tick_upper.to_i32();
             let pool_hash = InternalImpl::_hash_pool_key(self, pool_key);
             let position_hash = InternalImpl::_hash_position_key(
-                self, pool_hash, owner, tick_lower, tick_upper,
+                self, pool_hash, owner, tick_lower_i32, tick_upper_i32,
             );
             self.positions.read(position_hash)
         }
@@ -263,33 +275,35 @@ pub mod ZylithPool {
         fn mint(
             ref self: ContractState,
             pool_key: PoolKey,
-            tick_lower: i32,
-            tick_upper: i32,
+            tick_lower: Tick,
+            tick_upper: Tick,
             amount: u128,
             recipient: ContractAddress,
         ) -> (u256, u256) {
             assert(amount > 0, Errors::ZERO_LIQUIDITY);
+            let tick_lower_i32 = tick_lower.to_i32();
+            let tick_upper_i32 = tick_upper.to_i32();
 
             let pool_hash = self._hash_pool_key(pool_key);
             self._assert_pool_initialized(pool_hash);
 
             let mut pool_state = self.pools.read(pool_hash);
-            validate_position_params(tick_lower, tick_upper, pool_key.fee_tier.tick_spacing);
+            validate_position_params(tick_lower_i32, tick_upper_i32, pool_key.fee_tier.tick_spacing);
 
             // Calculate fee growth inside position range
             let (fee_growth_inside_0, fee_growth_inside_1) = self
-                ._get_fee_growth_inside(pool_hash, pool_state, tick_lower, tick_upper);
+                ._get_fee_growth_inside(pool_hash, pool_state, tick_lower_i32, tick_upper_i32);
 
             // Read or initialize position
             let position_hash = self
-                ._hash_position_key(pool_hash, recipient, tick_lower, tick_upper);
+                ._hash_position_key(pool_hash, recipient, tick_lower_i32, tick_upper_i32);
             let pos = self.positions.read(position_hash);
 
             // Mint position using library function
             let (updated_pos, result) = mint_position(
                 pos,
-                tick_lower,
-                tick_upper,
+                tick_lower_i32,
+                tick_upper_i32,
                 pool_key.fee_tier.tick_spacing,
                 amount,
                 pool_state.sqrt_price,
@@ -303,14 +317,15 @@ pub mod ZylithPool {
                 ._update_ticks_for_position(
                     pool_hash,
                     pool_state,
-                    tick_lower,
-                    tick_upper,
+                    tick_lower_i32,
+                    tick_upper_i32,
                     liquidity_delta,
                     pool_key.fee_tier.tick_spacing,
                 );
 
             // Update pool active liquidity if current tick is in range
-            if pool_state.tick >= tick_lower && pool_state.tick < tick_upper {
+            if pool_state.tick.to_i32() >= tick_lower_i32
+                && pool_state.tick.to_i32() < tick_upper_i32 {
                 pool_state.liquidity = pool_state.liquidity + amount;
             }
 
@@ -354,11 +369,13 @@ pub mod ZylithPool {
         fn burn(
             ref self: ContractState,
             pool_key: PoolKey,
-            tick_lower: i32,
-            tick_upper: i32,
+            tick_lower: Tick,
+            tick_upper: Tick,
             amount: u128,
         ) -> (u256, u256) {
             assert(amount > 0, Errors::ZERO_LIQUIDITY);
+            let tick_lower_i32 = tick_lower.to_i32();
+            let tick_upper_i32 = tick_upper.to_i32();
 
             let pool_hash = self._hash_pool_key(pool_key);
             self._assert_pool_initialized(pool_hash);
@@ -368,18 +385,18 @@ pub mod ZylithPool {
 
             // Calculate fee growth inside
             let (fee_growth_inside_0, fee_growth_inside_1) = self
-                ._get_fee_growth_inside(pool_hash, pool_state, tick_lower, tick_upper);
+                ._get_fee_growth_inside(pool_hash, pool_state, tick_lower_i32, tick_upper_i32);
 
             // Read position
             let position_hash = self
-                ._hash_position_key(pool_hash, caller, tick_lower, tick_upper);
+                ._hash_position_key(pool_hash, caller, tick_lower_i32, tick_upper_i32);
             let pos = self.positions.read(position_hash);
 
             // Burn position using library function
             let (updated_pos, result) = burn_position(
                 pos,
-                tick_lower,
-                tick_upper,
+                tick_lower_i32,
+                tick_upper_i32,
                 amount,
                 pool_state.sqrt_price,
                 fee_growth_inside_0,
@@ -392,14 +409,15 @@ pub mod ZylithPool {
                 ._update_ticks_for_position(
                     pool_hash,
                     pool_state,
-                    tick_lower,
-                    tick_upper,
+                    tick_lower_i32,
+                    tick_upper_i32,
                     neg_delta,
                     pool_key.fee_tier.tick_spacing,
                 );
 
             // Update pool active liquidity if current tick is in range
-            if pool_state.tick >= tick_lower && pool_state.tick < tick_upper {
+            if pool_state.tick.to_i32() >= tick_lower_i32
+                && pool_state.tick.to_i32() < tick_upper_i32 {
                 pool_state.liquidity = pool_state.liquidity - amount;
             }
 
@@ -430,23 +448,25 @@ pub mod ZylithPool {
         fn collect(
             ref self: ContractState,
             pool_key: PoolKey,
-            tick_lower: i32,
-            tick_upper: i32,
+            tick_lower: Tick,
+            tick_upper: Tick,
             amount_0_requested: u128,
             amount_1_requested: u128,
             recipient: ContractAddress,
         ) -> (u128, u128) {
+            let tick_lower_i32 = tick_lower.to_i32();
+            let tick_upper_i32 = tick_upper.to_i32();
             let pool_hash = self._hash_pool_key(pool_key);
             self._assert_pool_initialized(pool_hash);
 
             let caller = get_caller_address();
             let position_hash = self
-                ._hash_position_key(pool_hash, caller, tick_lower, tick_upper);
+                ._hash_position_key(pool_hash, caller, tick_lower_i32, tick_upper_i32);
 
             // Update position fee accounting first
             let pool_state = self.pools.read(pool_hash);
             let (fee_growth_inside_0, fee_growth_inside_1) = self
-                ._get_fee_growth_inside(pool_hash, pool_state, tick_lower, tick_upper);
+                ._get_fee_growth_inside(pool_hash, pool_state, tick_lower_i32, tick_upper_i32);
 
             let mut pos = self.positions.read(position_hash);
             // Trigger fee accumulation by calling update_position with 0 delta
@@ -542,7 +562,7 @@ pub mod ZylithPool {
 
             // Update pool state
             pool_state.sqrt_price = final_sqrt_price;
-            pool_state.tick = final_tick;
+            pool_state.tick = TickTrait::from_i32(final_tick);
             pool_state.liquidity = final_liquidity;
             pool_state.fee_growth_global_0 = final_fee_growth_0;
             pool_state.fee_growth_global_1 = final_fee_growth_1;
@@ -599,7 +619,7 @@ pub mod ZylithPool {
                         amount_1_is_negative: amount_1.sign,
                         sqrt_price: final_sqrt_price,
                         liquidity: final_liquidity,
-                        tick: final_tick,
+                        tick: TickTrait::from_i32(final_tick),
                     },
                 );
 
@@ -708,7 +728,7 @@ pub mod ZylithPool {
             assert(amount_out >= pi.amount_out_min, 'Insufficient output amount');
 
             pool_state.sqrt_price = final_sqrt_price;
-            pool_state.tick = final_tick;
+            pool_state.tick = TickTrait::from_i32(final_tick);
             pool_state.liquidity = final_liquidity;
             pool_state.fee_growth_global_0 = final_fee_growth_0;
             pool_state.fee_growth_global_1 = final_fee_growth_1;
@@ -736,9 +756,9 @@ pub mod ZylithPool {
             };
             let pi = coordinator.verify_mint(full_proof_with_hints);
 
-            // Convert unsigned ticks from proof to signed ticks for CLMM
-            let tick_lower = offset_tick_to_signed(pi.tick_lower);
-            let tick_upper = offset_tick_to_signed(pi.tick_upper);
+            // Convert Tick from verified proof to signed i32 for CLMM
+            let tick_lower = pi.tick_lower.to_i32();
+            let tick_upper = pi.tick_upper.to_i32();
 
             // Add liquidity to CLMM state (no token transfers)
             let mut pool_state = self.pools.read(pool_hash);
@@ -774,7 +794,8 @@ pub mod ZylithPool {
                     pool_key.fee_tier.tick_spacing,
                 );
 
-            if pool_state.tick >= tick_lower && pool_state.tick < tick_upper {
+            if pool_state.tick.to_i32() >= tick_lower
+                && pool_state.tick.to_i32() < tick_upper {
                 pool_state.liquidity = pool_state.liquidity + liquidity;
             }
 
@@ -782,8 +803,9 @@ pub mod ZylithPool {
             self.pools.write(pool_hash, pool_state);
         }
 
-        /// Shielded burn: verify ZK proof, then remove liquidity from CLMM state.
-        /// Tick range is extracted from verified proof public inputs.
+        /// Shielded burn: verify ZK proof, remove liquidity, collect tokens_owed back
+        /// into the shielded pool. Tokens remain in the pool contract — the output
+        /// commitments from the proof represent the new shielded notes.
         fn shielded_burn(
             ref self: ContractState,
             pool_key: PoolKey,
@@ -801,11 +823,11 @@ pub mod ZylithPool {
             };
             let pi = coordinator.verify_burn(full_proof_with_hints);
 
-            // Convert unsigned ticks from proof to signed ticks for CLMM
-            let tick_lower = offset_tick_to_signed(pi.tick_lower);
-            let tick_upper = offset_tick_to_signed(pi.tick_upper);
+            // Convert Tick from verified proof to signed i32 for CLMM
+            let tick_lower = pi.tick_lower.to_i32();
+            let tick_upper = pi.tick_upper.to_i32();
 
-            // Remove liquidity from CLMM state (no token transfers)
+            // Remove liquidity from CLMM state
             let mut pool_state = self.pools.read(pool_hash);
 
             let (fee_growth_inside_0, fee_growth_inside_1) = self
@@ -816,7 +838,7 @@ pub mod ZylithPool {
                 ._hash_position_key(pool_hash, owner, tick_lower, tick_upper);
             let pos = self.positions.read(position_hash);
 
-            let (updated_pos, _result) = burn_position(
+            let (mut updated_pos, _result) = burn_position(
                 pos,
                 tick_lower,
                 tick_upper,
@@ -837,12 +859,54 @@ pub mod ZylithPool {
                     pool_key.fee_tier.tick_spacing,
                 );
 
-            if pool_state.tick >= tick_lower && pool_state.tick < tick_upper {
+            if pool_state.tick.to_i32() >= tick_lower
+                && pool_state.tick.to_i32() < tick_upper {
                 pool_state.liquidity = pool_state.liquidity - liquidity;
             }
 
+            // Collect all tokens_owed back into the shielded pool.
+            // Tokens stay in this contract — the output note commitments in the
+            // ZK proof are the shielded receipts for these amounts.
+            let (final_pos, _collected_0, _collected_1) = collect_fees(
+                updated_pos,
+                updated_pos.tokens_owed_0,
+                updated_pos.tokens_owed_1,
+            );
+            updated_pos = final_pos;
+
             self.positions.write(position_hash, updated_pos);
             self.pools.write(pool_hash, pool_state);
+        }
+
+        /// Withdraw tokens from the shielded pool via ZK membership proof.
+        /// Verifies proof and transfers tokens to the recipient specified in the proof.
+        fn withdraw(ref self: ContractState, full_proof_with_hints: Span<felt252>) {
+            // Verify proof and extract verified public inputs
+            let coordinator = IVerifierCoordinatorDispatcher {
+                contract_address: self.coordinator.read(),
+            };
+            let pi = coordinator.verify_membership(full_proof_with_hints);
+
+            // Reconstruct full amount from u128 parts
+            let amount: u256 = u256 {
+                low: pi.amount_low,
+                high: pi.amount_high
+            };
+
+            // Transfer tokens from Pool to the verified recipient
+            IERC20Dispatcher { contract_address: pi.token }
+                .transfer(pi.recipient, amount);
+
+            // Emit event
+            self
+                .emit(
+                    TokensWithdrawn {
+                        recipient: pi.recipient,
+                        token: pi.token,
+                        amount,
+                        nullifier_hash: pi.nullifier_hash,
+                    },
+                );
         }
     }
 
@@ -928,7 +992,7 @@ pub mod ZylithPool {
             get_fee_growth_inside(
                 tick_lower,
                 tick_upper,
-                pool_state.tick,
+                pool_state.tick.to_i32(),
                 pool_state.fee_growth_global_0,
                 pool_state.fee_growth_global_1,
                 lower_info.fee_growth_outside_0,
@@ -962,7 +1026,7 @@ pub mod ZylithPool {
                     lower_info,
                     liquidity_delta,
                     tick_lower,
-                    pool_state.tick,
+                    pool_state.tick.to_i32(),
                     pool_state.fee_growth_global_0,
                     pool_state.fee_growth_global_1,
                     false, // lower tick
@@ -985,7 +1049,7 @@ pub mod ZylithPool {
                     upper_info,
                     liquidity_delta,
                     tick_upper,
-                    pool_state.tick,
+                    pool_state.tick.to_i32(),
                     pool_state.fee_growth_global_0,
                     pool_state.fee_growth_global_1,
                     true, // upper tick
@@ -1030,7 +1094,7 @@ pub mod ZylithPool {
             let mut amount_remaining = amount_specified;
             let mut amount_calculated: u256 = 0;
             let mut current_sqrt_price = pool_state.sqrt_price;
-            let mut current_tick = pool_state.tick;
+            let mut current_tick = pool_state.tick.to_i32();
             let mut current_liquidity = pool_state.liquidity;
             let mut fee_growth_global_0 = pool_state.fee_growth_global_0;
             let mut fee_growth_global_1 = pool_state.fee_growth_global_1;

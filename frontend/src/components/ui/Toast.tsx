@@ -11,12 +11,12 @@ type ToastVariant = "success" | "error" | "info";
 
 interface Toast {
   id: string;
-  message: string;
+  message: string | ReactNode;
   variant: ToastVariant;
 }
 
 interface ToastContextValue {
-  toast: (message: string, variant?: ToastVariant) => void;
+  toast: (message: string | ReactNode, variant?: ToastVariant) => void;
 }
 
 const ToastContext = createContext<ToastContextValue>({
@@ -42,7 +42,7 @@ const variantDot: Record<ToastVariant, string> = {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = useCallback((message: string, variant: ToastVariant = "info") => {
+  const addToast = useCallback((message: string | ReactNode, variant: ToastVariant = "info") => {
     const id = crypto.randomUUID();
     setToasts((prev) => [...prev, { id, message, variant }]);
     setTimeout(() => {
@@ -69,7 +69,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             )}
           >
             <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", variantDot[t.variant])} />
-            <p className="flex-1 text-sm text-text-body">{t.message}</p>
+            <div className="flex-1 text-sm text-text-body">{t.message}</div>
             <button
               onClick={() => removeToast(t.id)}
               className="shrink-0 text-text-disabled hover:text-text-caption"

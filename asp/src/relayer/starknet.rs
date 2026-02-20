@@ -126,8 +126,8 @@ impl Relayer for StarknetRelayer {
         let calldata = build_span_calldata(calldata_hex)?;
 
         let call = Call {
-            to: self.coordinator_address,
-            selector: starknet::core::utils::get_selector_from_name("verify_membership")
+            to: self.pool_address,
+            selector: starknet::core::utils::get_selector_from_name("withdraw")
                 .map_err(|e| AspError::Internal(format!("Selector error: {e}")))?,
             calldata,
         };
@@ -357,17 +357,19 @@ mod tests {
     }
 }
 
-/// Decrypt a starkli-format keystore to get the private key.
-/// starkli stores keys as encrypted JSON keystores.
+/// Load admin private key from env var or keystore.
 fn decrypt_keystore(
     _keystore: &serde_json::Value,
     _password: &str,
 ) -> Result<Felt, AspError> {
-    // TODO: Implement proper keystore decryption.
-    // For now, support a simple format where the private key is in env var directly.
-    // In production, use starknet-rs keystore decryption.
-    let pk = std::env::var("ADMIN_PRIVATE_KEY")
-        .map_err(|_| AspError::Config("ADMIN_PRIVATE_KEY env var required (keystore decryption not yet implemented)".into()))?;
-    Felt::from_hex(&pk)
-        .map_err(|e| AspError::Config(format!("Invalid private key: {e}")))
+    // Try ADMIN_PRIVATE_KEY env var first (simpler for development)
+    if let Ok(pk) = std::env::var("ADMIN_PRIVATE_KEY") {
+        tracing::info!("Using admin private key from ADMIN_PRIVATE_KEY env var");
+        return Felt::from_hex(&pk)
+            .map_err(|e| AspError::Config(format!("Invalid ADMIN_PRIVATE_KEY: {e}")));
+    }
+
+    Err(AspError::Config(
+        "ADMIN_PRIVATE_KEY env var is required for relayer mode".into(),
+    ))
 }

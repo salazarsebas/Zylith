@@ -13,9 +13,8 @@ pub struct DepositRequest {
 pub struct DepositResponse {
     pub status: String,
     pub leaf_index: u32,
-    pub tx_hash: String,
+    pub calldata: Vec<String>, // Calldata for user to submit via Cavos
     pub root: String,
-    pub root_tx_hash: String,
 }
 
 // --- Withdraw (membership) ---
@@ -27,6 +26,7 @@ pub struct WithdrawRequest {
     pub amount_low: String,
     pub amount_high: String,
     pub token: String,
+    pub recipient: String,
     pub leaf_index: u32,
 }
 

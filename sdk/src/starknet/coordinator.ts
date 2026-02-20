@@ -6,11 +6,11 @@ export class CoordinatorReader {
   private contract: Contract;
 
   constructor(provider: RpcProvider, coordinatorAddress: string) {
-    this.contract = new Contract(
-      COORDINATOR_ABI,
-      coordinatorAddress,
-      provider,
-    );
+    this.contract = new Contract({
+      abi: COORDINATOR_ABI,
+      address: coordinatorAddress,
+      providerOrAccount: provider,
+    });
   }
 
   async isNullifierSpent(nullifierHash: string): Promise<boolean> {

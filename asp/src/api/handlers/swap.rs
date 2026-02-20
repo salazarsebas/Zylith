@@ -19,8 +19,8 @@ fn validate_swap_request(req: &SwapRequest) -> Result<(), AspError> {
     validate_address(&req.input_note.token, "input_note.token")?;
 
     // Swap params
-    validate_decimal(&req.swap_params.token_in, "swap_params.token_in")?;
-    validate_decimal(&req.swap_params.token_out, "swap_params.token_out")?;
+    validate_address(&req.swap_params.token_in, "swap_params.token_in")?;
+    validate_address(&req.swap_params.token_out, "swap_params.token_out")?;
     validate_decimal(&req.swap_params.amount_in, "swap_params.amount_in")?;
     validate_decimal(&req.swap_params.amount_out_min, "swap_params.amount_out_min")?;
     validate_decimal(&req.swap_params.amount_out_low, "swap_params.amount_out_low")?;
@@ -122,11 +122,14 @@ pub async fn shielded_swap(
     drop(worker);
 
     // 8. Submit to pool.shielded_swap
-    let relayer = state.relayer.lock().await;
-    let tx_hash = relayer
-        .shielded_swap(&req.pool_key, &proof_result.calldata, &req.sqrt_price_limit)
-        .await?;
-    drop(relayer);
+    let tx_hash = if let Some(ref relayer) = state.relayer {
+        let relayer = relayer.lock().await;
+        relayer
+            .shielded_swap(&req.pool_key, &proof_result.calldata, &req.sqrt_price_limit)
+            .await?
+    } else {
+        return Err(AspError::Internal("No relayer configured".into()));
+    };
 
     // 9. Record nullifier as spent
     state
@@ -141,12 +144,49 @@ pub async fn shielded_swap(
         .cloned()
         .unwrap_or_default();
 
+    // 10. Insert output and change commitments into Merkle tree
+    let mut worker = state.worker.lock().await;
+    let mut last_root = String::new();
+
+    // Insert output commitment (always present)
+    let leaf_index = state.db.get_leaf_count()?;
+    state
+        .db
+        .insert_commitment(leaf_index as u32, &output_commitment.commitment, Some(&tx_hash))?;
+    last_root = worker.insert_leaf(&output_commitment.commitment).await?;
+    tracing::debug!(leaf_index = leaf_index, "Inserted output_commitment");
+
+    // Insert change commitment if non-zero
+    if !change_commitment.is_empty() && change_commitment != "0" {
+        let leaf_index = state.db.get_leaf_count()?;
+        state
+            .db
+            .insert_commitment(leaf_index as u32, &change_commitment, Some(&tx_hash))?;
+        last_root = worker.insert_leaf(&change_commitment).await?;
+        tracing::debug!(leaf_index = leaf_index, "Inserted change_commitment");
+    }
+
+    drop(worker);
+
+    // 11. Store the final root in DB
+    let new_count = state.db.get_leaf_count()?;
+    state.db.insert_root(&last_root, new_count as u32, Some(&tx_hash))?;
+
+    // 12. Submit the new Merkle root to Coordinator on-chain
+    if let Some(ref relayer) = state.relayer {
+        let relayer = relayer.lock().await;
+        let root_tx = relayer.submit_merkle_root(&last_root).await?;
+        tracing::info!(tx_hash = %root_tx, "Merkle root submitted on-chain after swap");
+    } else {
+        tracing::warn!("No relayer configured — root stored locally only");
+    }
+
     tracing::info!(tx_hash = %tx_hash, "Shielded swap confirmed");
 
     Ok(Json(SwapResponse {
         status: "confirmed".to_string(),
         tx_hash,
-        new_commitment: output_commitment.commitment,
-        change_commitment,
+        new_commitment: output_commitment.commitment.clone(),
+        change_commitment: change_commitment.clone(),
     }))
 }

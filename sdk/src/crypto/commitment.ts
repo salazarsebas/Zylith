@@ -45,6 +45,9 @@ export function computeCommitment(
 /**
  * Compute a position commitment and nullifier hash.
  * Returns { commitment, nullifierHash } as decimal strings.
+ *
+ * IMPORTANT: Uses UNSIGNED (offset) ticks for commitment calculation,
+ * matching the circuit and ASP backend behavior.
  */
 export function computePositionCommitment(
   secret: string | bigint,
@@ -53,8 +56,13 @@ export function computePositionCommitment(
   tickUpper: number,
   liquidity: string | bigint,
 ): PositionCommitmentResult {
+  // Convert signed ticks to unsigned (offset) ticks for circuit compatibility
+  const TICK_OFFSET = 887272;
+  const tickLowerUnsigned = tickLower + TICK_OFFSET;
+  const tickUpperUnsigned = tickUpper + TICK_OFFSET;
+
   const nullifierHash = hash([nullifier]);
-  const commitment = hash([secret, nullifier, tickLower, tickUpper, liquidity]);
+  const commitment = hash([secret, nullifier, tickLowerUnsigned, tickUpperUnsigned, liquidity]);
 
   return { commitment, nullifierHash };
 }

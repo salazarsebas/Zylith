@@ -14,13 +14,19 @@ export function WithdrawCard() {
   const isInitialized = useSdkStore((s) => s.isInitialized);
   const unspentNotes = useSdkStore((s) => s.unspentNotes);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
   const withdraw = useWithdraw();
 
   const handleWithdraw = () => {
     if (!selectedNote) return;
     withdraw.mutate(
       { noteCommitment: selectedNote.commitment },
-      { onSuccess: () => setSelectedNote(null) }
+      {
+        onSuccess: (data) => {
+          setLastTxHash(data.txHash);
+          setSelectedNote(null);
+        }
+      }
     );
   };
 
@@ -32,7 +38,8 @@ export function WithdrawCard() {
           <h2 className="text-base font-medium text-text-heading">Unshield Tokens</h2>
         </div>
         <p className="text-sm text-text-caption">
-          Move tokens from the privacy pool back to your public wallet.
+          Reveal a shielded note and withdraw its tokens back to your public wallet.
+          A zero-knowledge proof verifies you own the note without revealing which one.
         </p>
 
         {!isInitialized ? (
@@ -41,7 +48,7 @@ export function WithdrawCard() {
           <p className="text-sm text-text-disabled">No shielded notes to withdraw.</p>
         ) : (
           <div className="space-y-2">
-            <p className="text-xs font-medium text-text-caption">Select a note to unshield:</p>
+            <p className="text-xs font-medium text-text-caption">Select a shielded note to withdraw:</p>
             {unspentNotes.map((note) => (
               <button
                 key={note.commitment}
@@ -73,6 +80,20 @@ export function WithdrawCard() {
         >
           Unshield Tokens
         </Button>
+
+        {lastTxHash && (
+          <div className="rounded-md border border-green-500/20 bg-green-500/5 p-3">
+            <p className="text-sm text-text-body mb-2">✓ Tokens unshielded successfully</p>
+            <a
+              href={`https://sepolia.voyager.online/tx/${lastTxHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-gold hover:underline"
+            >
+              View on Voyager →
+            </a>
+          </div>
+        )}
       </Card>
 
       <ProofProgress open={withdraw.isPending} label="Unshielding Tokens" />

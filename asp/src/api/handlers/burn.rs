@@ -83,9 +83,21 @@ pub async fn shielded_burn(
         )
         .await?;
 
-    // 4. Build burn circuit inputs
+    // 4. Compute position commitment and nullifier hash
+    let position = worker
+        .compute_position_commitment(
+            &req.position_note.secret,
+            &req.position_note.nullifier,
+            tick_lower_unsigned as i32,
+            tick_upper_unsigned as i32,
+            &req.position_note.liquidity,
+        )
+        .await?;
+
+    // 5. Build burn circuit inputs
     let inputs = serde_json::json!({
         "root": proof.root,
+        "positionNullifierHash": position.nullifier_hash,
         "newCommitment0": output0.commitment,
         "newCommitment1": output1.commitment,
         "tickLower": tick_lower_unsigned.to_string(),
@@ -110,23 +122,72 @@ pub async fn shielded_burn(
         "token1": req.output_note_1.token,
     });
 
-    // 5. Generate burn proof
+    // 6. Generate burn proof
     let proof_result = worker.generate_proof("burn", inputs).await?;
     drop(worker);
 
-    // 6. Submit to pool.shielded_burn
-    let relayer = state.relayer.lock().await;
-    let tx_hash = relayer
-        .shielded_burn(&req.pool_key, &proof_result.calldata, req.liquidity)
-        .await?;
-    drop(relayer);
+    // 7. Submit to pool.shielded_burn
+    let tx_hash = if let Some(ref relayer) = state.relayer {
+        let relayer = relayer.lock().await;
+        relayer
+            .shielded_burn(&req.pool_key, &proof_result.calldata, req.liquidity)
+            .await?
+    } else {
+        return Err(AspError::Internal("No relayer configured".into()));
+    };
+
+    // 8. Record position nullifier as spent
+    state
+        .db
+        .insert_nullifier(&position.nullifier_hash, "burn", Some(&tx_hash))?;
+
+    // 9. Insert output commitments into Merkle tree
+    let mut worker = state.worker.lock().await;
+    let mut last_root = String::new();
+
+    // Insert output commitment 0 if non-zero
+    if !output0.commitment.is_empty() && output0.commitment != "0" {
+        let leaf_index = state.db.get_leaf_count()?;
+        state
+            .db
+            .insert_commitment(leaf_index as u32, &output0.commitment, Some(&tx_hash))?;
+        last_root = worker.insert_leaf(&output0.commitment).await?;
+        tracing::debug!(leaf_index = leaf_index, "Inserted output_commitment_0");
+    }
+
+    // Insert output commitment 1 if non-zero
+    if !output1.commitment.is_empty() && output1.commitment != "0" {
+        let leaf_index = state.db.get_leaf_count()?;
+        state
+            .db
+            .insert_commitment(leaf_index as u32, &output1.commitment, Some(&tx_hash))?;
+        last_root = worker.insert_leaf(&output1.commitment).await?;
+        tracing::debug!(leaf_index = leaf_index, "Inserted output_commitment_1");
+    }
+
+    drop(worker);
+
+    // 10. Store the final root in DB (if we inserted anything)
+    if !last_root.is_empty() {
+        let new_count = state.db.get_leaf_count()?;
+        state.db.insert_root(&last_root, new_count as u32, Some(&tx_hash))?;
+
+        // 11. Submit the new Merkle root to Coordinator on-chain
+        if let Some(ref relayer) = state.relayer {
+            let relayer = relayer.lock().await;
+            let root_tx = relayer.submit_merkle_root(&last_root).await?;
+            tracing::info!(tx_hash = %root_tx, "Merkle root submitted on-chain after burn");
+        } else {
+            tracing::warn!("No relayer configured — root stored locally only");
+        }
+    }
 
     tracing::info!(tx_hash = %tx_hash, "Shielded burn confirmed");
 
     Ok(Json(BurnResponse {
         status: "confirmed".to_string(),
         tx_hash,
-        new_commitment_0: output0.commitment,
-        new_commitment_1: output1.commitment,
+        new_commitment_0: output0.commitment.clone(),
+        new_commitment_1: output1.commitment.clone(),
     }))
 }

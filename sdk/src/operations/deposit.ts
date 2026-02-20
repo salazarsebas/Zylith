@@ -12,11 +12,10 @@ export interface DepositParams {
 }
 
 export interface DepositResult {
-  txHash: string;
+  calldata: string[]; // Calldata for user to submit
   leafIndex: number;
   commitment: string;
   root: string;
-  rootTxHash: string;
 }
 
 export async function deposit(
@@ -49,10 +48,9 @@ export async function deposit(
   noteManager.setLeafIndex(note.commitment, response.leaf_index);
 
   return {
-    txHash: response.tx_hash,
+    calldata: response.calldata,
     leafIndex: response.leaf_index,
     commitment,
     root: response.root,
-    rootTxHash: response.root_tx_hash,
   };
 }

@@ -14,9 +14,10 @@ export function ShieldPage() {
 
   return (
     <PageContainer size="narrow">
-      <h1 className="text-2xl font-semibold text-text-display">Shield</h1>
+      <h1 className="text-2xl font-semibold text-text-display">Shield / Unshield</h1>
       <p className="mt-2 text-text-caption">
-        Move tokens between your public wallet and the privacy pool.
+        Shield tokens to register private commitments in the Zylith privacy pool.
+        Unshield to reveal and withdraw tokens back to your public wallet.
       </p>
 
       <div className="mt-6">

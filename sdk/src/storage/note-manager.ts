@@ -19,22 +19,26 @@ export class NoteManager {
     this.db = { notes: [], positions: [], version: 1 };
   }
 
-  /** Create and store a new note. Computes commitment automatically. */
+  /** Create and store a new note. Computes commitment automatically unless provided. */
   addNote(params: {
     secret: string;
     nullifier: string;
     amount: bigint;
     token: string;
     leafIndex?: number;
+    commitment?: string;
+    txHash?: string;
   }): Note {
     const { low, high } = u256Split(params.amount);
-    const { commitment, nullifierHash } = computeCommitment(
+    const computed = computeCommitment(
       params.secret,
       params.nullifier,
       low.toString(),
       high.toString(),
       params.token,
     );
+    const commitment = params.commitment ?? computed.commitment;
+    const nullifierHash = computed.nullifierHash;
 
     const note: Note = {
       secret: params.secret,
@@ -58,15 +62,36 @@ export class NoteManager {
     tickLower: number;
     tickUpper: number;
     liquidity: bigint;
+    commitment?: string;
     leafIndex?: number;
+    txHash?: string;
   }): PositionNote {
-    const { commitment, nullifierHash } = computePositionCommitment(
-      params.secret,
-      params.nullifier,
-      params.tickLower,
-      params.tickUpper,
-      params.liquidity.toString(),
-    );
+    // Use provided commitment if available (from ASP), otherwise compute it
+    let commitment: string;
+    let nullifierHash: string;
+
+    if (params.commitment) {
+      commitment = params.commitment;
+      // Still need to compute nullifierHash
+      const computed = computePositionCommitment(
+        params.secret,
+        params.nullifier,
+        params.tickLower,
+        params.tickUpper,
+        params.liquidity.toString(),
+      );
+      nullifierHash = computed.nullifierHash;
+    } else {
+      const computed = computePositionCommitment(
+        params.secret,
+        params.nullifier,
+        params.tickLower,
+        params.tickUpper,
+        params.liquidity.toString(),
+      );
+      commitment = computed.commitment;
+      nullifierHash = computed.nullifierHash;
+    }
 
     const position: PositionNote = {
       secret: params.secret,
@@ -78,6 +103,7 @@ export class NoteManager {
       commitment,
       nullifierHash,
       spent: false,
+      txHash: params.txHash,
     };
 
     this.db.positions.push(position);
@@ -90,6 +116,17 @@ export class NoteManager {
     if (note) note.leafIndex = leafIndex;
     const pos = this.db.positions.find((p) => p.commitment === commitment);
     if (pos) pos.leafIndex = leafIndex;
+  }
+
+  /** Update leaf indexes from ASP sync response */
+  updateLeafIndexes(
+    syncData: { commitment: string; leaf_index: number | null }[],
+  ): void {
+    for (const { commitment, leaf_index } of syncData) {
+      if (leaf_index !== null) {
+        this.setLeafIndex(commitment, leaf_index);
+      }
+    }
   }
 
   /** Mark a note as spent by its nullifier hash */

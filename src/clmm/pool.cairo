@@ -4,6 +4,7 @@ use starknet::ContractAddress;
 use super::fees::FeeTier;
 use super::math::sqrt_price::validate_sqrt_price;
 use super::math::tick_math::validate_tick;
+use crate::types::{Tick, TickTrait};
 
 /// Pool key uniquely identifies a pool
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -17,7 +18,7 @@ pub struct PoolKey {
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct PoolState {
     pub sqrt_price: u256, // Current sqrt price (Q128.128)
-    pub tick: i32, // Current tick
+    pub tick: Tick, // Current tick
     pub liquidity: u128, // Active liquidity in current tick
     pub fee_growth_global_0: u256, // Global fee growth for token0 (Q128.128)
     pub fee_growth_global_1: u256, // Global fee growth for token1 (Q128.128)
@@ -39,7 +40,7 @@ pub struct TickInfo {
 #[derive(Copy, Drop, Serde)]
 pub struct Slot0 {
     pub sqrt_price: u256,
-    pub tick: i32,
+    pub tick: Tick,
 }
 
 /// Errors
@@ -91,7 +92,7 @@ pub fn initialize_pool_state(sqrt_price: u256, tick: i32) -> PoolState {
 
     PoolState {
         sqrt_price,
-        tick,
+        tick: TickTrait::from_i32(tick),
         liquidity: 0,
         fee_growth_global_0: 0,
         fee_growth_global_1: 0,
@@ -173,6 +174,7 @@ mod tests {
     use starknet::ContractAddress;
     use super::super::fees::StandardFeeTiers;
     use super::{create_pool_key, initialize_pool_state, initialize_tick_info, update_tick};
+    use crate::types::TickTrait;
 
     #[test]
     fn test_create_pool_key() {
@@ -195,7 +197,7 @@ mod tests {
         let state = initialize_pool_state(sqrt_price, tick);
 
         assert(state.sqrt_price == sqrt_price, 'Invalid sqrt price');
-        assert(state.tick == tick, 'Invalid tick');
+        assert(state.tick == TickTrait::from_i32(tick), 'Invalid tick');
         assert(state.liquidity == 0, 'Liquidity should be 0');
     }
 

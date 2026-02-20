@@ -21,8 +21,8 @@
 /// 5. Coordinator updates state (nullifiers, Merkle tree, events)
 
 use super::types::{
-    BurnPublicInputs, Errors, MintPublicInputs, SwapPublicInputs, extract_burn_inputs,
-    extract_membership_inputs, extract_mint_inputs, extract_swap_inputs,
+    BurnPublicInputs, Errors, MembershipPublicInputs, MintPublicInputs, SwapPublicInputs,
+    extract_burn_inputs, extract_membership_inputs, extract_mint_inputs, extract_swap_inputs,
 };
 
 #[starknet::contract]
@@ -32,16 +32,18 @@ pub mod VerifierCoordinator {
         StoragePointerWriteAccess,
     };
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
+    use core::num::traits::Zero;
     use crate::interfaces::coordinator::IVerifierCoordinator;
     use crate::interfaces::verifier::{
         IGroth16VerifierBN254Dispatcher, IGroth16VerifierBN254DispatcherTrait,
     };
+    use crate::types::{Tick, TickTrait};
     use crate::privacy::merkle::{
         MAX_LEAVES, ROOT_HISTORY_SIZE, TREE_HEIGHT, get_zero_value, hash_left_right,
     };
     use super::{
-        BurnPublicInputs, Errors, MintPublicInputs, SwapPublicInputs, extract_burn_inputs,
-        extract_membership_inputs, extract_mint_inputs, extract_swap_inputs,
+        BurnPublicInputs, Errors, MembershipPublicInputs, MintPublicInputs, SwapPublicInputs,
+        extract_burn_inputs, extract_membership_inputs, extract_mint_inputs, extract_swap_inputs,
     };
 
     // ========================================================================
@@ -92,6 +94,10 @@ pub mod VerifierCoordinator {
     pub struct MembershipVerified {
         pub nullifier_hash: u256,
         pub root: u256,
+        pub recipient: ContractAddress,
+        pub amount_low: u128,
+        pub amount_high: u128,
+        pub token: ContractAddress,
         pub timestamp: u64,
     }
 
@@ -110,8 +116,8 @@ pub mod VerifierCoordinator {
         pub nullifier_hash0: u256,
         pub nullifier_hash1: u256,
         pub position_commitment: u256,
-        pub tick_lower: u32,
-        pub tick_upper: u32,
+        pub tick_lower: Tick,
+        pub tick_upper: Tick,
         pub timestamp: u64,
     }
 
@@ -120,8 +126,8 @@ pub mod VerifierCoordinator {
         pub position_nullifier_hash: u256,
         pub new_commitment0: u256,
         pub new_commitment1: u256,
-        pub tick_lower: u32,
-        pub tick_upper: u32,
+        pub tick_lower: Tick,
+        pub tick_upper: Tick,
         pub timestamp: u64,
     }
 
@@ -180,7 +186,7 @@ pub mod VerifierCoordinator {
     impl CoordinatorImpl of IVerifierCoordinator<ContractState> {
         fn verify_membership(
             ref self: ContractState, full_proof_with_hints: Span<felt252>,
-        ) -> bool {
+        ) -> MembershipPublicInputs {
             self._assert_not_paused();
 
             // Call Garaga verifier
@@ -190,15 +196,17 @@ pub mod VerifierCoordinator {
             let result = verifier.verify_groth16_proof_bn254(full_proof_with_hints);
 
             // Extract public inputs from verified proof
-            let public_inputs_raw = match result {
-                Result::Ok(inputs) => inputs,
-                Result::Err(_) => { return false; },
-            };
+            let public_inputs_raw = result.expect(Errors::INVALID_PROOF);
             let pi = extract_membership_inputs(public_inputs_raw);
 
             // Validate state
             self._assert_known_root(pi.root);
             self._assert_nullifier_not_spent(pi.nullifier_hash);
+
+            // Validate withdrawal parameters
+            assert(!pi.recipient.is_zero(), 'Invalid recipient');
+            assert(!pi.token.is_zero(), 'Invalid token');
+            assert(pi.amount_low != 0 || pi.amount_high != 0, 'Invalid amount');
 
             // Update state
             self._mark_nullifier_spent(pi.nullifier_hash);
@@ -209,11 +217,15 @@ pub mod VerifierCoordinator {
                     MembershipVerified {
                         nullifier_hash: pi.nullifier_hash,
                         root: pi.root,
+                        recipient: pi.recipient,
+                        amount_low: pi.amount_low,
+                        amount_high: pi.amount_high,
+                        token: pi.token,
                         timestamp: get_block_timestamp(),
                     },
                 );
 
-            true
+            pi
         }
 
         fn verify_swap(
@@ -275,7 +287,7 @@ pub mod VerifierCoordinator {
             self._assert_known_root(pi.root);
             self._assert_nullifier_not_spent(pi.nullifier_hash0);
             self._assert_nullifier_not_spent(pi.nullifier_hash1);
-            assert(pi.tick_lower < pi.tick_upper, Errors::INVALID_TICK_RANGE);
+            assert(pi.tick_lower.to_i32() < pi.tick_upper.to_i32(), Errors::INVALID_TICK_RANGE);
 
             // Update state
             self._mark_nullifier_spent(pi.nullifier_hash0);
@@ -318,7 +330,7 @@ pub mod VerifierCoordinator {
             // Validate state
             self._assert_known_root(pi.root);
             self._assert_nullifier_not_spent(pi.position_nullifier_hash);
-            assert(pi.tick_lower < pi.tick_upper, Errors::INVALID_TICK_RANGE);
+            assert(pi.tick_lower.to_i32() < pi.tick_upper.to_i32(), Errors::INVALID_TICK_RANGE);
 
             // Update state
             self._mark_nullifier_spent(pi.position_nullifier_hash);

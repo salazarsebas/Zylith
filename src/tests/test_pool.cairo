@@ -1,6 +1,6 @@
 use crate::clmm::pool::PoolKey;
 use crate::clmm::fees::StandardFeeTiers;
-use crate::types::{i256, I256Trait};
+use crate::types::{I256Trait, TickTrait};
 use crate::interfaces::pool::{IZylithPoolDispatcher, IZylithPoolDispatcherTrait};
 use crate::interfaces::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
 use starknet::ContractAddress;
@@ -118,7 +118,7 @@ fn test_initialize_pool() {
     stop_cheat_caller_address(pool_address);
 
     assert(state.sqrt_price == SQRT_PRICE_1_0, 'Wrong sqrt_price');
-    assert(state.tick == 0, 'Wrong tick');
+    assert(state.tick == TickTrait::new(false, 0), 'Wrong tick');
     assert(state.liquidity == 0, 'Liquidity should be 0');
 }
 
@@ -146,8 +146,8 @@ fn test_mint_liquidity() {
     start_cheat_caller_address(pool_address, user1());
     pool.initialize(pool_key, SQRT_PRICE_1_0);
 
-    let tick_lower: i32 = -120;
-    let tick_upper: i32 = 120;
+    let tick_lower = TickTrait::new(true, 120);
+    let tick_upper = TickTrait::new(false, 120);
     let liquidity: u128 = 1_000_000;
 
     let (amount_0, amount_1) = pool.mint(pool_key, tick_lower, tick_upper, liquidity, user1());
@@ -174,8 +174,8 @@ fn test_burn_liquidity() {
     start_cheat_caller_address(pool_address, user1());
     pool.initialize(pool_key, SQRT_PRICE_1_0);
 
-    let tick_lower: i32 = -120;
-    let tick_upper: i32 = 120;
+    let tick_lower = TickTrait::new(true, 120);
+    let tick_upper = TickTrait::new(false, 120);
     let liquidity: u128 = 1_000_000;
     pool.mint(pool_key, tick_lower, tick_upper, liquidity, user1());
 
@@ -207,8 +207,8 @@ fn test_swap_zero_for_one() {
     pool.initialize(pool_key, SQRT_PRICE_1_0);
 
     // Provide deep liquidity
-    let tick_lower: i32 = -120;
-    let tick_upper: i32 = 120;
+    let tick_lower = TickTrait::new(true, 120);
+    let tick_upper = TickTrait::new(false, 120);
     let liquidity: u128 = 10_000_000_000;
     pool.mint(pool_key, tick_lower, tick_upper, liquidity, user1());
 
@@ -240,8 +240,8 @@ fn test_swap_one_for_zero() {
     start_cheat_caller_address(pool_address, user1());
     pool.initialize(pool_key, SQRT_PRICE_1_0);
 
-    let tick_lower: i32 = -120;
-    let tick_upper: i32 = 120;
+    let tick_lower = TickTrait::new(true, 120);
+    let tick_upper = TickTrait::new(false, 120);
     let liquidity: u128 = 10_000_000_000;
     pool.mint(pool_key, tick_lower, tick_upper, liquidity, user1());
 
@@ -276,8 +276,8 @@ fn test_collect_protocol_fees() {
     start_cheat_caller_address(pool_address, user1());
     pool.initialize(pool_key, SQRT_PRICE_1_0);
 
-    let tick_lower: i32 = -120;
-    let tick_upper: i32 = 120;
+    let tick_lower = TickTrait::new(true, 120);
+    let tick_upper = TickTrait::new(false, 120);
     let liquidity: u128 = 10_000_000_000;
     pool.mint(pool_key, tick_lower, tick_upper, liquidity, user1());
 
@@ -333,8 +333,8 @@ fn test_shielded_swap() {
     pool.initialize(pool_key, SQRT_PRICE_1_0);
 
     // Need public liquidity for the swap to trade against
-    let tick_lower: i32 = -120;
-    let tick_upper: i32 = 120;
+    let tick_lower = TickTrait::new(true, 120);
+    let tick_upper = TickTrait::new(false, 120);
     let liquidity: u128 = 10_000_000_000;
     pool.mint(pool_key, tick_lower, tick_upper, liquidity, user1());
     stop_cheat_caller_address(pool_address);

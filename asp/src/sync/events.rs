@@ -18,6 +18,14 @@ fn nullifier_spent_selector() -> Felt {
     starknet::core::utils::get_selector_from_name("NullifierSpent").unwrap()
 }
 
+fn mint_verified_selector() -> Felt {
+    starknet::core::utils::get_selector_from_name("MintVerified").unwrap()
+}
+
+fn burn_verified_selector() -> Felt {
+    starknet::core::utils::get_selector_from_name("BurnVerified").unwrap()
+}
+
 /// Reconstruct a u256 from two consecutive felt252 values (low, high) as decimal string.
 fn felts_to_decimal(low: &Felt, high: &Felt) -> String {
     let low_bytes = low.to_bytes_be();
@@ -45,6 +53,20 @@ struct CommitmentAddedEvent {
 #[derive(Debug)]
 struct NullifierSpentEvent {
     nullifier_hash_decimal: String,
+}
+
+/// Parsed MintVerified event (contains change commitments).
+#[derive(Debug)]
+struct MintVerifiedEvent {
+    change_commitment_0: String,
+    change_commitment_1: String,
+}
+
+/// Parsed BurnVerified event (contains output commitments).
+#[derive(Debug)]
+struct BurnVerifiedEvent {
+    new_commitment_0: String,
+    new_commitment_1: String,
 }
 
 /// Parse a CommitmentAdded event from raw data.
@@ -170,7 +192,13 @@ async fn poll_events(
 }
 
 /// Submit the current Merkle root on-chain if it differs from the last submitted root.
+/// In proof-only mode (relayer = None), this is a no-op since users submit their own transactions.
 async fn submit_root_if_changed(state: &Arc<AppState>) -> Result<(), AspError> {
+    // In proof-only mode, we don't submit roots - users do when they submit deposits
+    if state.relayer.is_none() {
+        return Ok(());
+    }
+
     let leaf_count = state.db.get_leaf_count()?;
     if leaf_count == 0 {
         return Ok(());
@@ -193,7 +221,7 @@ async fn submit_root_if_changed(state: &Arc<AppState>) -> Result<(), AspError> {
         "Submitting new Merkle root"
     );
 
-    let relayer = state.relayer.lock().await;
+    let relayer = state.relayer.as_ref().unwrap().lock().await;
     let tx_hash = relayer.submit_merkle_root(&current_root).await?;
     drop(relayer);
 

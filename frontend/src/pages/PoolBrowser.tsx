@@ -3,206 +3,169 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { AmountInput } from "@/components/ui/AmountInput";
 import { Input } from "@/components/ui/Input";
 import { ShieldIcon } from "@/components/ui/ShieldIcon";
-import { ProofProgress } from "@/components/features/shared/ProofProgress";
 import { usePoolState } from "@/hooks/usePoolState";
-import { useMint } from "@/hooks/useMint";
-import { useSdkStore } from "@/stores/sdkStore";
-import { TESTNET_TOKENS, getTokenSymbol } from "@/config/tokens";
-import { formatTokenAmount, parseTokenAmount } from "@/lib/format";
+import { TESTNET_TOKENS, type Token } from "@/config/tokens";
 import { FEE_TIERS } from "@zylith/sdk";
-import type { PoolKey, Note } from "@zylith/sdk";
-
-const FEE_OPTIONS = [
-  { label: "0.05%", ...FEE_TIERS.LOW },
-  { label: "0.30%", ...FEE_TIERS.MEDIUM },
-  { label: "1.00%", ...FEE_TIERS.HIGH },
-];
+import type { PoolKey } from "@zylith/sdk";
 
 export function PoolBrowser() {
-  const isInitialized = useSdkStore((s) => s.isInitialized);
-  const unspentNotes = useSdkStore((s) => s.unspentNotes);
+  // Fixed pool: STRK/ETH with 0.3% fee
+  const token0 = TESTNET_TOKENS.find(t => t.symbol === "STRK")!;
+  const token1 = TESTNET_TOKENS.find(t => t.symbol === "ETH")!;
 
-  // Pool selection
-  const token0 = TESTNET_TOKENS[0];
-  const token1 = TESTNET_TOKENS[1];
-  const [feeTier, setFeeTier] = useState(FEE_OPTIONS[1]);
-
-  const poolKey: PoolKey | null =
-    token0 && token1
-      ? {
-          token0: BigInt(token0.address) < BigInt(token1.address) ? token0.address : token1.address,
-          token1: BigInt(token0.address) < BigInt(token1.address) ? token1.address : token0.address,
-          fee: feeTier.fee,
-          tickSpacing: feeTier.tickSpacing,
-        }
-      : null;
+  const poolKey: PoolKey = {
+    token0: token0.address,
+    token1: token1.address,
+    fee: FEE_TIERS.MEDIUM.fee,
+    tickSpacing: FEE_TIERS.MEDIUM.tickSpacing,
+  };
 
   const { data: poolState, isLoading: poolLoading } = usePoolState(poolKey);
-
-  // Liquidity form
-  const [tickLower, setTickLower] = useState("-1000");
-  const [tickUpper, setTickUpper] = useState("1000");
-  const [amount0, setAmount0] = useState("");
-  const [amount1, setAmount1] = useState("");
-
-  const mint = useMint();
-
-  const findNote = (tokenAddr: string, minAmount: bigint): Note | undefined =>
-    unspentNotes.find(
-      (n) => n.token.toLowerCase() === tokenAddr.toLowerCase() && BigInt(n.amount) >= minAmount
-    );
-
-  const handleMint = () => {
-    if (!poolKey || !token0 || !token1) return;
-    const parsed0 = parseTokenAmount(amount0, token0.decimals);
-    const parsed1 = parseTokenAmount(amount1, token1.decimals);
-    const note0 = findNote(poolKey.token0, parsed0);
-    const note1 = findNote(poolKey.token1, parsed1);
-    if (!note0 || !note1) return;
-
-    mint.mutate(
-      {
-        poolKey,
-        inputNote0Commitment: note0.commitment,
-        inputNote1Commitment: note1.commitment,
-        tickLower: parseInt(tickLower),
-        tickUpper: parseInt(tickUpper),
-        liquidity: parsed0,
-        amount0: parsed0,
-        amount1: parsed1,
-      },
-      {
-        onSuccess: () => {
-          setAmount0("");
-          setAmount1("");
-        },
-      }
-    );
-  };
+  const isEmpty = poolState && poolState.liquidity === 0n;
 
   return (
     <PageContainer size="wide">
-      <h1 className="text-2xl font-semibold text-text-display">Pools</h1>
-      <p className="mt-2 text-text-caption">
-        Browse pools and add shielded liquidity.
-      </p>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-semibold text-text-display">
+            {token0.symbol}/{token1.symbol} Pool
+          </h1>
+          <p className="mt-2 text-text-caption">
+            View pool statistics and liquidity status. To add liquidity or swap, use the Swap page.
+          </p>
+        </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        {/* Pool Info */}
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-medium text-text-heading">
-              {token0?.symbol}/{token1?.symbol}
-            </h2>
-            <div className="flex gap-1">
-              {FEE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.fee}
-                  onClick={() => setFeeTier(opt)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                    feeTier.fee === opt.fee
-                      ? "bg-gold/10 text-gold border border-gold/20"
-                      : "text-text-caption hover:text-text-body border border-transparent"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+        {/* Pool Status Card */}
+        <Card className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-medium text-text-heading">Pool Status</h2>
+            <Badge variant="default" className="text-xs">
+              Fee: 0.30%
+            </Badge>
           </div>
 
           {poolLoading ? (
-            <p className="text-sm text-text-disabled">Loading pool state...</p>
+            <div className="text-center py-8">
+              <p className="text-sm text-text-disabled">Loading pool information...</p>
+            </div>
           ) : poolState ? (
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-text-caption">Current Tick</span>
-                <span className="text-text-body">{poolState.tick}</span>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-text-caption">Current Tick</p>
+                  <p className="text-lg font-medium text-text-body">{poolState.tick}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-text-caption">Total Liquidity</p>
+                  <p className="text-lg font-medium text-text-body font-mono">
+                    {poolState.liquidity.toString()}
+                  </p>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-text-caption">Liquidity</span>
-                <span className="text-text-body font-mono">
-                  {poolState.liquidity.toString()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-caption">Status</span>
+
+              <div className="flex items-center justify-between rounded-lg border border-border bg-surface-elevated p-3">
+                <span className="text-sm text-text-caption">Pool Status</span>
                 <Badge variant={poolState.liquidity > 0n ? "success" : "default"}>
-                  {poolState.liquidity > 0n ? "Active" : "Empty"}
+                  {poolState.liquidity > 0n ? "Active & Ready" : "Empty"}
                 </Badge>
               </div>
+
+              {isEmpty && (
+                <div className="rounded-lg border border-signal-warning/20 bg-signal-warning/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-full bg-signal-warning/10 p-2">
+                      <svg className="w-4 h-4 text-signal-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <p className="text-sm font-medium text-signal-warning">
+                        This pool has no liquidity yet
+                      </p>
+                      <p className="text-xs text-text-caption">
+                        The pool needs liquidity before you can swap. An admin will add initial liquidity.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {poolState.liquidity > 0n && (
+                <div className="rounded-lg border border-signal-success/20 bg-signal-success/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-full bg-signal-success/10 p-2">
+                      <svg className="w-4 h-4 text-signal-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <p className="text-sm font-medium text-signal-success">
+                        Pool is active and ready for swaps
+                      </p>
+                      <p className="text-xs text-text-caption">
+                        You can now shield tokens and make private swaps.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
-            <p className="text-sm text-text-disabled">
-              Pool not initialized or unavailable.
-            </p>
+            <div className="text-center py-8">
+              <p className="text-sm text-text-disabled">
+                Pool not initialized or unavailable.
+              </p>
+            </div>
           )}
         </Card>
 
-        {/* Add Liquidity */}
-        <Card className="space-y-4">
-          <div className="flex items-center gap-2">
-            <ShieldIcon size={16} className="text-gold" />
-            <h2 className="text-base font-medium text-text-heading">
-              Add Shielded Liquidity
-            </h2>
-          </div>
+        {/* Next Steps */}
+        {poolState && poolState.liquidity > 0n && (
+          <Card className="space-y-4">
+            <h2 className="text-base font-medium text-text-heading">Ready to Start</h2>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-surface-elevated">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gold/10 flex items-center justify-center text-gold font-medium">
+                  1
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-text-body">Shield Your Tokens</p>
+                  <p className="text-xs text-text-caption mt-1">
+                    Go to the Shield page to deposit {token0.symbol} or {token1.symbol} and get a private note.
+                  </p>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Tick Lower"
-              value={tickLower}
-              onChange={(e) => setTickLower(e.target.value)}
-              placeholder="-1000"
-            />
-            <Input
-              label="Tick Upper"
-              value={tickUpper}
-              onChange={(e) => setTickUpper(e.target.value)}
-              placeholder="1000"
-            />
-          </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-surface-elevated">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gold/10 flex items-center justify-center text-gold font-medium">
+                  2
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-text-body">Make Private Swaps</p>
+                  <p className="text-xs text-text-caption mt-1">
+                    Use the Swap page to trade privately using your shielded tokens with zero-knowledge proofs.
+                  </p>
+                </div>
+              </div>
 
-          <AmountInput
-            label={`Amount ${getTokenSymbol(poolKey?.token0 ?? "")}`}
-            placeholder="0.0"
-            value={amount0}
-            onChange={(e) => setAmount0(e.target.value)}
-            tokenAddress={poolKey?.token0}
-            balance={formatTokenAmount(
-              useSdkStore.getState().balances[poolKey?.token0 ?? ""] ?? 0n,
-              18
-            )}
-          />
-
-          <AmountInput
-            label={`Amount ${getTokenSymbol(poolKey?.token1 ?? "")}`}
-            placeholder="0.0"
-            value={amount1}
-            onChange={(e) => setAmount1(e.target.value)}
-            tokenAddress={poolKey?.token1}
-            balance={formatTokenAmount(
-              useSdkStore.getState().balances[poolKey?.token1 ?? ""] ?? 0n,
-              18
-            )}
-          />
-
-          <Button
-            variant="primary"
-            className="w-full"
-            onClick={handleMint}
-            disabled={!isInitialized || !amount0 || !amount1 || mint.isPending}
-            loading={mint.isPending}
-          >
-            Add Shielded Liquidity
-          </Button>
-        </Card>
+              <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-surface-elevated">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gold/10 flex items-center justify-center text-gold font-medium">
+                  3
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-text-body">Withdraw Anytime</p>
+                  <p className="text-xs text-text-caption mt-1">
+                    Return to Shield page to withdraw your tokens back to your wallet when you're done.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
       </div>
-
-      <ProofProgress open={mint.isPending} label="Adding Shielded Liquidity" />
     </PageContainer>
   );
 }
