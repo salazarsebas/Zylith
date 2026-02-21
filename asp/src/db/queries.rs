@@ -75,6 +75,20 @@ impl Database {
         Ok(count)
     }
 
+    pub fn find_commitment_leaf_index(&self, commitment: &str) -> Result<Option<u32>, AspError> {
+        let conn = self.conn()?;
+        let result: Result<u32, _> = conn.query_row(
+            "SELECT leaf_index FROM commitments WHERE commitment = ?1",
+            rusqlite::params![commitment],
+            |row| row.get(0),
+        );
+        match result {
+            Ok(index) => Ok(Some(index)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     // --- Merkle Roots ---
 
     pub fn insert_root(

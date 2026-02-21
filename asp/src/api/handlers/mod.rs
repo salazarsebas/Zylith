@@ -4,5 +4,6 @@ pub mod mint;
 pub mod nullifier;
 pub mod status;
 pub mod swap;
+pub mod sync;
 pub mod tree;
 pub mod withdraw;

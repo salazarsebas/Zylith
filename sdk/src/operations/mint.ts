@@ -101,6 +101,8 @@ export async function mint(
     tickLower: params.tickLower,
     tickUpper: params.tickUpper,
     liquidity: params.liquidity,
+    commitment: response.position_commitment,
+    txHash: response.tx_hash,
   });
 
   const change0Amount = BigInt(input0.amount) - params.amount0;
@@ -120,6 +122,22 @@ export async function mint(
       amount: change1Amount,
       token: input1.token,
     });
+  }
+
+  // Sync leaf indexes from ASP for change notes and position
+  const commitmentsToSync = [
+    response.change_commitment_0,
+    response.change_commitment_1,
+    response.position_commitment,
+  ].filter((c) => c && c !== "0");
+
+  if (commitmentsToSync.length > 0) {
+    try {
+      const syncResponse = await asp.syncCommitments(commitmentsToSync);
+      noteManager.updateLeafIndexes(syncResponse);
+    } catch (err) {
+      console.warn("Failed to sync leaf indexes from ASP:", err);
+    }
   }
 
   return {

@@ -10,7 +10,7 @@
 ///
 /// ## Public Input Ordering (from Garaga verifier)
 ///
-/// - Membership (2): [root, nullifierHash]
+/// - Membership (6): [root, nullifierHash, recipient, amount_low, amount_high, token]
 /// - Swap (8): [changeCommitment, root, nullifierHash, newCommitment, tokenIn, tokenOut, amountIn,
 /// amountOutMin]
 /// - Mint (8): [changeCommitment0, changeCommitment1, root, nullifierHash0, nullifierHash1,
@@ -18,6 +18,7 @@
 /// - Burn (6): [root, positionNullifierHash, newCommitment0, newCommitment1, tickLower, tickUpper]
 
 use starknet::ContractAddress;
+use crate::types::{Tick, TickTrait};
 
 // ============================================================================
 // Circuit-Specific Public Input Structures
@@ -26,11 +27,15 @@ use starknet::ContractAddress;
 // BN254 scalar field elements (~2^254) which exceed the Stark field (~2^251).
 // These MUST be stored as u256, not felt252.
 
-/// Public inputs for Membership circuit (2 signals)
+/// Public inputs for Membership circuit (6 signals)
 #[derive(Drop, Copy, Serde, PartialEq, Debug)]
 pub struct MembershipPublicInputs {
     pub root: u256,
     pub nullifier_hash: u256,
+    pub recipient: ContractAddress,
+    pub amount_low: u128,
+    pub amount_high: u128,
+    pub token: ContractAddress,
 }
 
 /// Public inputs for Swap circuit (8 signals)
@@ -47,7 +52,7 @@ pub struct SwapPublicInputs {
 }
 
 /// Public inputs for Mint circuit (8 signals)
-#[derive(Drop, Copy, Serde, PartialEq, Debug)]
+#[derive(Drop, Copy, Serde, PartialEq)]
 pub struct MintPublicInputs {
     pub change_commitment0: u256,
     pub change_commitment1: u256,
@@ -55,19 +60,19 @@ pub struct MintPublicInputs {
     pub nullifier_hash0: u256,
     pub nullifier_hash1: u256,
     pub position_commitment: u256,
-    pub tick_lower: u32,
-    pub tick_upper: u32,
+    pub tick_lower: Tick,
+    pub tick_upper: Tick,
 }
 
 /// Public inputs for Burn circuit (6 signals)
-#[derive(Drop, Copy, Serde, PartialEq, Debug)]
+#[derive(Drop, Copy, Serde, PartialEq)]
 pub struct BurnPublicInputs {
     pub root: u256,
     pub position_nullifier_hash: u256,
     pub new_commitment0: u256,
     pub new_commitment1: u256,
-    pub tick_lower: u32,
-    pub tick_upper: u32,
+    pub tick_lower: Tick,
+    pub tick_upper: Tick,
 }
 
 // ============================================================================
@@ -75,10 +80,22 @@ pub struct BurnPublicInputs {
 // ============================================================================
 
 /// Extract MembershipPublicInputs from Garaga verifier result
-/// Garaga order: [root, nullifierHash]
+/// Garaga order: [root, nullifierHash, recipient, amount_low, amount_high, token]
 pub fn extract_membership_inputs(inputs: Span<u256>) -> MembershipPublicInputs {
     assert(inputs.len() == PublicInputCounts::MEMBERSHIP, Errors::INVALID_PUBLIC_INPUT_COUNT);
-    MembershipPublicInputs { root: *inputs.at(0), nullifier_hash: *inputs.at(1) }
+
+    // amount_low and amount_high are u128 values, safe to cast
+    let amount_low: u128 = (*inputs.at(3)).try_into().expect('invalid amount_low');
+    let amount_high: u128 = (*inputs.at(4)).try_into().expect('invalid amount_high');
+
+    MembershipPublicInputs {
+        root: *inputs.at(0),
+        nullifier_hash: *inputs.at(1),
+        recipient: u256_to_felt(*inputs.at(2)).try_into().expect('invalid recipient'),
+        amount_low,
+        amount_high,
+        token: u256_to_felt(*inputs.at(5)).try_into().expect('invalid token'),
+    }
 }
 
 /// Extract SwapPublicInputs from Garaga verifier result
@@ -110,8 +127,8 @@ pub fn extract_mint_inputs(inputs: Span<u256>) -> MintPublicInputs {
         nullifier_hash0: *inputs.at(3),
         nullifier_hash1: *inputs.at(4),
         position_commitment: *inputs.at(5),
-        tick_lower: u256_to_u32(*inputs.at(6)),
-        tick_upper: u256_to_u32(*inputs.at(7)),
+        tick_lower: TickTrait::from_i32(offset_tick_to_signed(u256_to_u32(*inputs.at(6)))),
+        tick_upper: TickTrait::from_i32(offset_tick_to_signed(u256_to_u32(*inputs.at(7)))),
     }
 }
 
@@ -125,8 +142,8 @@ pub fn extract_burn_inputs(inputs: Span<u256>) -> BurnPublicInputs {
         position_nullifier_hash: *inputs.at(1),
         new_commitment0: *inputs.at(2),
         new_commitment1: *inputs.at(3),
-        tick_lower: u256_to_u32(*inputs.at(4)),
-        tick_upper: u256_to_u32(*inputs.at(5)),
+        tick_lower: TickTrait::from_i32(offset_tick_to_signed(u256_to_u32(*inputs.at(4)))),
+        tick_upper: TickTrait::from_i32(offset_tick_to_signed(u256_to_u32(*inputs.at(5)))),
     }
 }
 
@@ -150,7 +167,7 @@ fn u256_to_u32(value: u256) -> u32 {
 
 /// Number of public inputs for each circuit (from Garaga N_PUBLIC_INPUTS)
 pub mod PublicInputCounts {
-    pub const MEMBERSHIP: u32 = 2;
+    pub const MEMBERSHIP: u32 = 6;
     pub const SWAP: u32 = 8;
     pub const MINT: u32 = 8;
     pub const BURN: u32 = 6;

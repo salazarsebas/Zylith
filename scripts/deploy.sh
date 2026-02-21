@@ -68,6 +68,11 @@ echo ""
 # ---- Common starkli flags ----
 RPC_FLAGS=(--rpc "$STARKNET_RPC_URL" --account "$STARKNET_ACCOUNT" --keystore "$STARKNET_KEYSTORE")
 
+# ---- Helper: extract first 0x hex string with 40+ chars from text ----
+extract_hash() {
+    echo "$1" | grep -oE '0x[0-9a-fA-F]{40,}' | head -1
+}
+
 # ---- Helper: declare a contract, return class hash ----
 declare_contract() {
     local sierra_file="$1"
@@ -77,34 +82,52 @@ declare_contract() {
     local output
     output=$(starkli declare "$sierra_file" "${RPC_FLAGS[@]}" 2>&1) || true
 
-    # Check if already declared
-    if echo "$output" | grep -q "StarknetErrorCode.CLASS_ALREADY_DECLARED\|already declared\|AlreadyDeclared"; then
-        local hash
-        hash=$(echo "$output" | grep -oE '0x[0-9a-fA-F]{50,}' | head -1)
-        if [[ -n "$hash" ]]; then
-            echo "   Already declared: $hash" >&2
-            echo "$hash"
-            return
-        fi
-    fi
-
     # Handle CASM hash mismatch — retry with the expected hash
     if echo "$output" | grep -q "Mismatch compiled class hash"; then
         local expected_hash
-        expected_hash=$(echo "$output" | grep -o 'Expected: 0x[0-9a-fA-F]*' | head -1 | cut -d' ' -f2)
+        expected_hash=$(echo "$output" | grep -oE 'Expected: 0x[0-9a-fA-F]+' | head -1 | sed 's/Expected: //')
         if [[ -n "$expected_hash" ]]; then
-            echo "   CASM mismatch — retrying with expected hash..." >&2
+            echo "   CASM mismatch detected." >&2
+            echo "   Expected CASM hash: $expected_hash" >&2
+            echo "   Retrying with --casm-hash flag..." >&2
+            # Save first output's class hash before overwriting
+            local first_class_hash
+            first_class_hash=$(echo "$output" | grep -oE 'Declaring Cairo 1 class: 0x[0-9a-fA-F]+' | head -1 | sed 's/Declaring Cairo 1 class: //')
             output=$(starkli declare "$sierra_file" --casm-hash "$expected_hash" "${RPC_FLAGS[@]}" 2>&1) || true
+            echo "   Retry output: $output" >&2
+            # If retry says "already declared", use the class hash from first attempt
+            if echo "$output" | grep -qi "already declared\|Not declaring"; then
+                if [[ -n "$first_class_hash" ]]; then
+                    echo "   Already declared: $first_class_hash" >&2
+                    echo "$first_class_hash"
+                    return 0
+                fi
+            fi
         fi
     fi
 
+    # Check for "already declared" / "Not declaring" on first attempt
+    if echo "$output" | grep -qi "already declared\|Not declaring"; then
+        # Extract class hash - may be on the same or next line
+        local hash
+        hash=$(extract_hash "$output")
+        if [[ -n "$hash" ]]; then
+            echo "   Already declared: $hash" >&2
+            echo "$hash"
+            return 0
+        fi
+    fi
+
+    # Extract class hash from successful declaration
     local hash
-    hash=$(echo "$output" | grep -oE '0x[0-9a-fA-F]+' | tail -1)
+    hash=$(extract_hash "$output")
+
     if [[ -z "$hash" ]]; then
         echo "ERROR: Failed to declare $name:" >&2
         echo "$output" >&2
         exit 1
     fi
+
     echo "   Class hash: $hash" >&2
     echo "$hash"
 }
@@ -157,16 +180,36 @@ declare_and_deploy_verifier() {
     fi
 
     local class_hash
-    class_hash=$(declare_contract "$sierra_file" "$name" | tail -1)
+    class_hash=$(declare_contract "$sierra_file" "$name")
+
+    if [[ -z "$class_hash" ]]; then
+        echo "ERROR: No class hash returned for $name" >&2
+        exit 1
+    fi
+    echo "   Using class hash: $class_hash" >&2
 
     echo ">> Deploying $name..." >&2
     local deploy_output
-    deploy_output=$(starkli deploy "$class_hash" "${RPC_FLAGS[@]}" 2>&1)
+    deploy_output=$(starkli deploy "$class_hash" "${RPC_FLAGS[@]}" 2>&1) || true
+
+    # Print full deploy output for debugging
+    echo "   Deploy output: $deploy_output" >&2
+
     local address
-    address=$(echo "$deploy_output" | grep -oE '0x[0-9a-fA-F]{50,}' | tail -1)
+    # starkli prints: "The contract will be deployed at address 0x..."
+    # Then later: "Contract deployed: 0x..."
+    address=$(echo "$deploy_output" | grep -iE "deployed at address|Contract deployed" | grep -oE '0x[0-9a-fA-F]{40,}' | head -1)
+    if [[ -z "$address" ]]; then
+        # Fallback: look for any long hex that's NOT a known selector or class hash
+        address=$(echo "$deploy_output" | grep -v "invoke\|selector\|class" | grep -oE '0x[0-9a-fA-F]{40,}' | head -1)
+    fi
+    if [[ -z "$address" ]]; then
+        # Last resort: any long hex in the output
+        address=$(extract_hash "$deploy_output")
+    fi
 
     if [[ -z "$address" ]]; then
-        echo "ERROR: Failed to deploy $name:" >&2
+        echo "ERROR: Failed to extract address for $name:" >&2
         echo "$deploy_output" >&2
         exit 1
     fi
@@ -187,29 +230,55 @@ ADDR_BURN=$(declare_and_deploy_verifier "burn_verifier")
 # ---- Step 3: Declare & Deploy VerifierCoordinator ----
 echo ""
 COORD_SIERRA="$ROOT_DIR/target/release/zylith_VerifierCoordinator.contract_class.json"
-COORD_CLASS=$(declare_contract "$COORD_SIERRA" "VerifierCoordinator" | tail -1)
+COORD_CLASS=$(declare_contract "$COORD_SIERRA" "VerifierCoordinator")
 
 echo ">> Deploying VerifierCoordinator..."
-COORDINATOR_ADDRESS=$(starkli deploy "$COORD_CLASS" \
+COORD_OUTPUT=$(starkli deploy "$COORD_CLASS" \
     "$ADMIN_ADDRESS" \
     "$ADDR_MEMBERSHIP" \
     "$ADDR_SWAP" \
     "$ADDR_MINT" \
     "$ADDR_BURN" \
-    "${RPC_FLAGS[@]}" 2>&1 | grep -oE '0x[0-9a-fA-F]{50,}' | tail -1)
+    "${RPC_FLAGS[@]}" 2>&1) || true
+echo "   Deploy output: $COORD_OUTPUT"
+COORDINATOR_ADDRESS=$(echo "$COORD_OUTPUT" | grep -iE "deployed at address|Contract deployed" | grep -oE '0x[0-9a-fA-F]{40,}' | head -1)
+if [[ -z "$COORDINATOR_ADDRESS" ]]; then
+    COORDINATOR_ADDRESS=$(echo "$COORD_OUTPUT" | grep -v "invoke\|selector\|class" | grep -oE '0x[0-9a-fA-F]{40,}' | head -1)
+fi
+if [[ -z "$COORDINATOR_ADDRESS" ]]; then
+    COORDINATOR_ADDRESS=$(extract_hash "$COORD_OUTPUT")
+fi
+if [[ -z "$COORDINATOR_ADDRESS" ]]; then
+    echo "ERROR: Failed to deploy VerifierCoordinator:" >&2
+    echo "$COORD_OUTPUT" >&2
+    exit 1
+fi
 echo "   Address: $COORDINATOR_ADDRESS"
 
 # ---- Step 4: Declare & Deploy ZylithPool ----
 echo ""
 POOL_SIERRA="$ROOT_DIR/target/release/zylith_ZylithPool.contract_class.json"
-POOL_CLASS=$(declare_contract "$POOL_SIERRA" "ZylithPool" | tail -1)
+POOL_CLASS=$(declare_contract "$POOL_SIERRA" "ZylithPool")
 
 echo ">> Deploying ZylithPool..."
-POOL_ADDRESS=$(starkli deploy "$POOL_CLASS" \
+POOL_OUTPUT=$(starkli deploy "$POOL_CLASS" \
     "$ADMIN_ADDRESS" \
     "$COORDINATOR_ADDRESS" \
     "$PROTOCOL_FEE" \
-    "${RPC_FLAGS[@]}" 2>&1 | grep -oE '0x[0-9a-fA-F]{50,}' | tail -1)
+    "${RPC_FLAGS[@]}" 2>&1) || true
+echo "   Deploy output: $POOL_OUTPUT"
+POOL_ADDRESS=$(echo "$POOL_OUTPUT" | grep -iE "deployed at address|Contract deployed" | grep -oE '0x[0-9a-fA-F]{40,}' | head -1)
+if [[ -z "$POOL_ADDRESS" ]]; then
+    POOL_ADDRESS=$(echo "$POOL_OUTPUT" | grep -v "invoke\|selector\|class" | grep -oE '0x[0-9a-fA-F]{40,}' | head -1)
+fi
+if [[ -z "$POOL_ADDRESS" ]]; then
+    POOL_ADDRESS=$(extract_hash "$POOL_OUTPUT")
+fi
+if [[ -z "$POOL_ADDRESS" ]]; then
+    echo "ERROR: Failed to deploy ZylithPool:" >&2
+    echo "$POOL_OUTPUT" >&2
+    exit 1
+fi
 echo "   Address: $POOL_ADDRESS"
 
 # ---- Step 5: Write output ----

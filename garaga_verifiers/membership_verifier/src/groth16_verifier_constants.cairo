@@ -3,7 +3,7 @@
 use garaga::definitions::{E12D, G1Point, G2Line, G2Point, u288, u384};
 use garaga::groth16::Groth16VerifyingKey;
 
-pub const N_PUBLIC_INPUTS: usize = 2;
+pub const N_PUBLIC_INPUTS: usize = 6;
 
 pub const vk: Groth16VerifyingKey = Groth16VerifyingKey {
     alpha_beta_miller_loop_result: E12D {
@@ -122,7 +122,7 @@ pub const vk: Groth16VerifyingKey = Groth16VerifyingKey {
     },
 };
 
-pub const ic: [G1Point; 3] = [
+pub const ic: [G1Point; 7] = [
     G1Point {
         x: u384 {
             limb0: 0xdc9f9bd0760ea4a50631f563,
@@ -162,6 +162,62 @@ pub const ic: [G1Point; 3] = [
             limb0: 0xd493e08180950506f43cb96d,
             limb1: 0x626d49ecff26ed96a817be36,
             limb2: 0x1a00ca2a3f7ad2f9,
+            limb3: 0x0,
+        },
+    },
+    G1Point {
+        x: u384 {
+            limb0: 0x955a49834de55bfa4a38a35a,
+            limb1: 0xaecce4aab4da02ed9afddd4c,
+            limb2: 0x856a92666c0d746,
+            limb3: 0x0,
+        },
+        y: u384 {
+            limb0: 0x7c85a63f54391ee0a41d44f7,
+            limb1: 0x78a6a73858d08eff535d8f9d,
+            limb2: 0x13125936eae1917e,
+            limb3: 0x0,
+        },
+    },
+    G1Point {
+        x: u384 {
+            limb0: 0xc4ca26df6292a3e9500b384f,
+            limb1: 0xd72e107fb9223968cfa287b1,
+            limb2: 0x283efb77c1b72cc,
+            limb3: 0x0,
+        },
+        y: u384 {
+            limb0: 0x5eb8e6e8d6e2e35d20875182,
+            limb1: 0x2b5388b6f16f5891bbca821d,
+            limb2: 0x2e316ed9d6de7514,
+            limb3: 0x0,
+        },
+    },
+    G1Point {
+        x: u384 {
+            limb0: 0x6a15090a6db148b2e3c10b4a,
+            limb1: 0xfd82042d6af2342bf16b3641,
+            limb2: 0xa5f267dd5661030,
+            limb3: 0x0,
+        },
+        y: u384 {
+            limb0: 0xa4176a17a9cead60aafc383,
+            limb1: 0x9a2d814c45f8f784595cb29c,
+            limb2: 0x6e8f520b4b0416d,
+            limb3: 0x0,
+        },
+    },
+    G1Point {
+        x: u384 {
+            limb0: 0x5b7d102fd7d7d28e67af5076,
+            limb1: 0xe456e6b797bbf5fb8d8417b1,
+            limb2: 0x11b0e205ce56fed2,
+            limb3: 0x0,
+        },
+        y: u384 {
+            limb0: 0x43528e7b9d61b9413ef29ad6,
+            limb1: 0x954abd15aa9d1d8aa5e85cd3,
+            limb2: 0x2038b9dbef7a3448,
             limb3: 0x0,
         },
     },

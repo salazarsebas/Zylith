@@ -14,6 +14,7 @@ export type {
 export type { Note, PositionNote } from "./storage/types.js";
 
 // Constants
+export type { Tick } from "./types/constants.js";
 export {
   TREE_HEIGHT,
   MAX_LEAVES,
@@ -25,6 +26,8 @@ export {
   BN254_SCALAR_FIELD,
   signedToOffsetTick,
   offsetToSignedTick,
+  toTick,
+  fromTick,
 } from "./types/constants.js";
 
 // Utilities
@@ -35,6 +38,8 @@ export {
   u256Combine,
   generateRandomSecret,
 } from "./utils/conversions.js";
+
+export { getAmountsForBurn } from "./utils/clmm.js";
 
 export {
   validateTick,
@@ -75,8 +80,16 @@ export type {
 // Starknet readers
 export { PoolReader } from "./starknet/pool.js";
 export { CoordinatorReader } from "./starknet/coordinator.js";
-export { SEPOLIA_ADDRESSES } from "./starknet/contracts.js";
+export { SEPOLIA_ADDRESSES, POOL_ABI, COORDINATOR_ABI } from "./starknet/contracts.js";
 export type { ContractAddresses } from "./starknet/contracts.js";
+
+// Approval helpers
+export {
+  checkApproval,
+  checkMultipleApprovals,
+  buildMulticallWithApprovals,
+} from "./starknet/approvals.js";
+export type { ApprovalCheck, ApprovalResult } from "./starknet/approvals.js";
 
 // Note manager
 export { NoteManager } from "./storage/note-manager.js";

@@ -5,7 +5,7 @@ use tracing_subscriber::EnvFilter;
 use zylith_asp::config::Config;
 use zylith_asp::db::Database;
 use zylith_asp::prover::Worker;
-use zylith_asp::relayer::{Relayer, StarknetRelayer};
+use zylith_asp::relayer::StarknetRelayer;
 use zylith_asp::AppState;
 
 #[tokio::main]
@@ -44,16 +44,24 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!(leaf_count = leaves.len(), root = %root, "Merkle tree rebuilt");
     }
 
-    // Initialize Starknet relayer
-    let relayer = StarknetRelayer::new(&config).await?;
-    tracing::info!("Starknet relayer initialized");
+    // Initialize relayer for on-chain transaction submission
+    let relayer = match StarknetRelayer::new(&config).await {
+        Ok(r) => {
+            tracing::info!("Starknet relayer initialized (admin can submit on-chain txs)");
+            Some(Mutex::new(Box::new(r) as Box<dyn zylith_asp::relayer::Relayer>))
+        }
+        Err(e) => {
+            tracing::warn!("Relayer not available: {e} — running in proof-only mode");
+            None
+        }
+    };
 
     // Build shared state
     let state = Arc::new(AppState {
         config: config.clone(),
         db,
         worker: Mutex::new(worker),
-        relayer: Mutex::new(Box::new(relayer) as Box<dyn Relayer>),
+        relayer,
     });
 
     // Spawn event sync background task

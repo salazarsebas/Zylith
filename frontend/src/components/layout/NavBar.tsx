@@ -6,8 +6,9 @@ const navLinks = [
   { to: "/app", label: "Dashboard", end: true },
   { to: "/app/swap", label: "Swap" },
   { to: "/app/shield", label: "Shield" },
-  { to: "/app/pool", label: "Pool" },
+  { to: "/app/liquidity", label: "Liquidity" },
   { to: "/app/positions", label: "Positions" },
+  { to: "/app/settings", label: "Settings" },
 ];
 
 export function NavBar() {

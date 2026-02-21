@@ -4,6 +4,7 @@ import type { Note, PositionNote } from "@zylith/sdk";
 import { env } from "@/config/env";
 
 const NOTES_STORAGE_KEY = "zylith_notes";
+const PASSWORD_STORAGE_KEY = "zylith_password";
 
 interface SdkState {
   client: ZylithClient | null;
@@ -19,9 +20,11 @@ interface SdkState {
 
   // Actions
   checkExistingNotes: () => void;
+  autoInitialize: () => Promise<boolean>;
   initialize: (password: string) => Promise<void>;
   refreshBalances: () => void;
   lock: () => void;
+  resetVault: () => void;
 }
 
 export const useSdkStore = create<SdkState>((set, get) => ({
@@ -39,6 +42,20 @@ export const useSdkStore = create<SdkState>((set, get) => ({
     set({ hasExistingNotes: exists });
   },
 
+  autoInitialize: async () => {
+    const savedPassword = localStorage.getItem(PASSWORD_STORAGE_KEY);
+    if (!savedPassword) return false;
+
+    try {
+      await get().initialize(savedPassword);
+      return true;
+    } catch {
+      // Password might be wrong, clear it
+      localStorage.removeItem(PASSWORD_STORAGE_KEY);
+      return false;
+    }
+  },
+
   initialize: async (password: string) => {
     set({ isInitializing: true, initError: null });
     try {
@@ -50,6 +67,10 @@ export const useSdkStore = create<SdkState>((set, get) => ({
         password,
       });
       await client.init();
+
+      // Save password to localStorage so we don't ask again
+      localStorage.setItem(PASSWORD_STORAGE_KEY, password);
+
       set({
         client,
         isInitialized: true,
@@ -85,6 +106,8 @@ export const useSdkStore = create<SdkState>((set, get) => ({
   },
 
   lock: () => {
+    // Clear password when user locks/disconnects
+    localStorage.removeItem(PASSWORD_STORAGE_KEY);
     set({
       client: null,
       isInitialized: false,
@@ -94,5 +117,22 @@ export const useSdkStore = create<SdkState>((set, get) => ({
       unspentNotes: [],
       unspentPositions: [],
     });
+  },
+
+  resetVault: () => {
+    // Complete vault reset - deletes all encrypted notes
+    localStorage.removeItem(NOTES_STORAGE_KEY);
+    localStorage.removeItem(PASSWORD_STORAGE_KEY);
+    set({
+      client: null,
+      isInitialized: false,
+      isInitializing: false,
+      initError: null,
+      hasExistingNotes: false,
+      balances: {},
+      unspentNotes: [],
+      unspentPositions: [],
+    });
+    window.location.reload();
   },
 }));

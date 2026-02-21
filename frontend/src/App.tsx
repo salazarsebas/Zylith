@@ -5,6 +5,7 @@ import { Dashboard } from "@/pages/Dashboard";
 import { SwapPage } from "@/pages/SwapPage";
 import { ShieldPage } from "@/pages/ShieldPage";
 import { PoolBrowser } from "@/pages/PoolBrowser";
+import { LiquidityPage } from "@/pages/LiquidityPage";
 import { PositionsPage } from "@/pages/PositionsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 
@@ -20,6 +21,7 @@ const router = createBrowserRouter([
       { index: true, element: <Dashboard /> },
       { path: "swap", element: <SwapPage /> },
       { path: "shield", element: <ShieldPage /> },
+      { path: "liquidity", element: <LiquidityPage /> },
       { path: "pool", element: <PoolBrowser /> },
       { path: "positions", element: <PositionsPage /> },
       { path: "settings", element: <SettingsPage /> },

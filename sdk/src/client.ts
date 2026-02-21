@@ -66,6 +66,24 @@ export class ZylithClient {
     if (this.initialized) return;
     if (!isInitialized()) await initPoseidon();
     this.noteManager = await NoteManager.load(this.config.password);
+
+    // Auto-sync leaf indexes for notes that are missing one
+    if (this.asp) {
+      const missing = [
+        ...this.noteManager.getAllNotes().filter((n) => !n.spent && n.leafIndex === undefined),
+        ...this.noteManager.getAllPositions().filter((p) => !p.spent && p.leafIndex === undefined),
+      ];
+      if (missing.length > 0) {
+        try {
+          const syncData = await this.asp.syncCommitments(missing.map((n) => n.commitment));
+          this.noteManager.updateLeafIndexes(syncData);
+          await this.noteManager.save();
+        } catch {
+          // Non-fatal
+        }
+      }
+    }
+
     this.initialized = true;
   }
 

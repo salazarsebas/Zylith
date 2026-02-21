@@ -23,6 +23,7 @@ export interface PositionNote {
   commitment: string;
   nullifierHash: string;
   spent: boolean;
+  txHash?: string;
 }
 
 /** Encrypted note database schema */

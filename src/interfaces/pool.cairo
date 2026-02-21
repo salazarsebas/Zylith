@@ -1,7 +1,7 @@
 use starknet::ContractAddress;
 use super::super::clmm::pool::{PoolKey, PoolState};
 use super::super::clmm::positions::Position;
-use super::super::types::i256;
+use super::super::types::{i256, Tick};
 
 /// Main pool interface for Zylith CLMM
 #[starknet::interface]
@@ -17,8 +17,8 @@ pub trait IZylithPool<TContractState> {
     fn mint(
         ref self: TContractState,
         pool_key: PoolKey,
-        tick_lower: i32,
-        tick_upper: i32,
+        tick_lower: Tick,
+        tick_upper: Tick,
         amount: u128,
         recipient: ContractAddress,
     ) -> (u256, u256);
@@ -26,7 +26,7 @@ pub trait IZylithPool<TContractState> {
     /// Burn liquidity from a position
     /// Returns (amount_0, amount_1) returned
     fn burn(
-        ref self: TContractState, pool_key: PoolKey, tick_lower: i32, tick_upper: i32, amount: u128,
+        ref self: TContractState, pool_key: PoolKey, tick_lower: Tick, tick_upper: Tick, amount: u128,
     ) -> (u256, u256);
 
     /// Collect fees from a position
@@ -34,8 +34,8 @@ pub trait IZylithPool<TContractState> {
     fn collect(
         ref self: TContractState,
         pool_key: PoolKey,
-        tick_lower: i32,
-        tick_upper: i32,
+        tick_lower: Tick,
+        tick_upper: Tick,
         amount_0_requested: u128,
         amount_1_requested: u128,
         recipient: ContractAddress,
@@ -59,8 +59,8 @@ pub trait IZylithPool<TContractState> {
         self: @TContractState,
         pool_key: PoolKey,
         owner: ContractAddress,
-        tick_lower: i32,
-        tick_upper: i32,
+        tick_lower: Tick,
+        tick_upper: Tick,
     ) -> Position;
 
     /// Collect protocol fees
@@ -98,6 +98,12 @@ pub trait IZylithPool<TContractState> {
         full_proof_with_hints: Span<felt252>,
         liquidity: u128,
     );
+
+    /// Withdraw tokens from shielded pool via ZK membership proof
+    /// The coordinator verifies the proof and returns verified public inputs
+    /// containing the recipient address, token, and amount.
+    /// The pool transfers the specified tokens to the verified recipient.
+    fn withdraw(ref self: TContractState, full_proof_with_hints: Span<felt252>);
 }
 
 /// Pool callback interface for flash accounting
@@ -120,7 +126,7 @@ pub struct PoolInitialized {
     #[key]
     pub pool_key: PoolKey,
     pub sqrt_price: u256,
-    pub tick: i32,
+    pub tick: Tick,
 }
 
 #[derive(Drop, starknet::Event)]
@@ -130,8 +136,8 @@ pub struct Mint {
     #[key]
     pub owner: ContractAddress,
     #[key]
-    pub tick_lower: i32,
-    pub tick_upper: i32,
+    pub tick_lower: Tick,
+    pub tick_upper: Tick,
     pub amount: u128,
     pub amount_0: u256,
     pub amount_1: u256,
@@ -142,8 +148,8 @@ pub struct Burn {
     #[key]
     pub owner: ContractAddress,
     #[key]
-    pub tick_lower: i32,
-    pub tick_upper: i32,
+    pub tick_lower: Tick,
+    pub tick_upper: Tick,
     pub amount: u128,
     pub amount_0: u256,
     pub amount_1: u256,
@@ -159,7 +165,7 @@ pub struct Swap {
     pub amount_1: i256,
     pub sqrt_price: u256,
     pub liquidity: u128,
-    pub tick: i32,
+    pub tick: Tick,
 }
 
 #[derive(Drop, starknet::Event)]
@@ -169,8 +175,8 @@ pub struct Collect {
     #[key]
     pub recipient: ContractAddress,
     #[key]
-    pub tick_lower: i32,
-    pub tick_upper: i32,
+    pub tick_lower: Tick,
+    pub tick_upper: Tick,
     pub amount_0: u128,
     pub amount_1: u128,
 }

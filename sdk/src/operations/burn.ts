@@ -82,6 +82,8 @@ export async function burn(
       nullifier: out0Nullifier,
       amount: params.amount0Out,
       token: params.token0,
+      commitment: response.new_commitment_0,
+      txHash: response.tx_hash,
     });
   }
   if (params.amount1Out > 0n) {
@@ -90,7 +92,24 @@ export async function burn(
       nullifier: out1Nullifier,
       amount: params.amount1Out,
       token: params.token1,
+      commitment: response.new_commitment_1,
+      txHash: response.tx_hash,
     });
+  }
+
+  // Sync leaf indexes from ASP for output notes
+  const commitmentsToSync = [
+    response.new_commitment_0,
+    response.new_commitment_1,
+  ].filter((c) => c && c !== "0");
+
+  if (commitmentsToSync.length > 0) {
+    try {
+      const syncResponse = await asp.syncCommitments(commitmentsToSync);
+      noteManager.updateLeafIndexes(syncResponse);
+    } catch (err) {
+      console.warn("Failed to sync leaf indexes from ASP:", err);
+    }
   }
 
   return {

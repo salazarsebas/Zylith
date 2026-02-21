@@ -18,6 +18,7 @@ pub async fn withdraw(
     validate_decimal(&req.amount_low, "amount_low")?;
     validate_decimal(&req.amount_high, "amount_high")?;
     validate_address(&req.token, "token")?;
+    validate_address(&req.recipient, "recipient")?;
 
     tracing::info!(leaf_index = req.leaf_index, "Processing withdrawal (membership proof)");
 
@@ -54,11 +55,12 @@ pub async fn withdraw(
     let inputs = serde_json::json!({
         "root": proof.root,
         "nullifierHash": commitment_result.nullifier_hash,
-        "secret": req.secret,
-        "nullifier": req.nullifier,
+        "recipient": req.recipient,
         "amount_low": req.amount_low,
         "amount_high": req.amount_high,
         "token": req.token,
+        "secret": req.secret,
+        "nullifier": req.nullifier,
         "pathElements": proof.path_elements,
         "pathIndices": proof.path_indices,
     });
@@ -67,10 +69,13 @@ pub async fn withdraw(
     let proof_result = worker.generate_proof("membership", inputs).await?;
     drop(worker);
 
-    // 7. Submit to coordinator.verify_membership
-    let relayer = state.relayer.lock().await;
-    let tx_hash = relayer.verify_membership(&proof_result.calldata).await?;
-    drop(relayer);
+    // 7. Submit to pool.withdraw() (which internally calls coordinator.verify_membership)
+    let tx_hash = if let Some(ref relayer) = state.relayer {
+        let relayer = relayer.lock().await;
+        relayer.verify_membership(&proof_result.calldata).await?
+    } else {
+        return Err(AspError::Internal("No relayer configured".into()));
+    };
 
     // 8. Record nullifier as spent
     state.db.insert_nullifier(

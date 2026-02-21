@@ -9,10 +9,11 @@ interface AmountInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "
   error?: string;
   label?: string;
   onMax?: () => void;
+  onTokenClick?: () => void;
 }
 
 export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(
-  ({ tokenAddress, balance, error, label, onMax, className, ...props }, ref) => {
+  ({ tokenAddress, balance, error, label, onMax, onTokenClick, className, ...props }, ref) => {
     return (
       <div className="space-y-1.5">
         {label && (
@@ -52,12 +53,26 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(
               </button>
             )}
             {tokenAddress && (
-              <div className="flex items-center gap-1.5 rounded-full bg-surface-elevated border border-border px-2.5 py-1">
+              <button
+                type="button"
+                onClick={onTokenClick}
+                disabled={!onTokenClick}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full bg-surface-elevated border border-border px-2.5 py-1",
+                  onTokenClick && "cursor-pointer hover:border-gold hover:bg-gold/5 transition-colors",
+                  !onTokenClick && "cursor-default"
+                )}
+              >
                 <TokenIcon address={tokenAddress} size="sm" />
                 <span className="text-sm font-medium text-text-heading">
                   {getTokenSymbol(tokenAddress)}
                 </span>
-              </div>
+                {onTokenClick && (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-text-caption">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </button>
             )}
           </div>
         </div>

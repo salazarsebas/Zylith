@@ -2,12 +2,17 @@
 import { Contract, RpcProvider } from "starknet";
 import { POOL_ABI } from "./abis/pool.js";
 import type { PoolKey, PoolState, Position } from "../types/index.js";
+import { fromTick, toTick } from "../types/constants.js";
 
 export class PoolReader {
   private contract: Contract;
 
   constructor(provider: RpcProvider, poolAddress: string) {
-    this.contract = new Contract(POOL_ABI, poolAddress, provider);
+    this.contract = new Contract({
+      abi: POOL_ABI,
+      address: poolAddress,
+      providerOrAccount: provider,
+    });
   }
 
   async getPoolState(poolKey: PoolKey): Promise<PoolState> {
@@ -18,7 +23,7 @@ export class PoolReader {
     });
     return {
       sqrtPrice: BigInt(result.sqrt_price),
-      tick: Number(result.tick),
+      tick: fromTick(result.tick),
       liquidity: BigInt(result.liquidity),
       feeGrowthGlobal0: BigInt(result.fee_growth_global_0),
       feeGrowthGlobal1: BigInt(result.fee_growth_global_1),
@@ -40,8 +45,8 @@ export class PoolReader {
         fee_tier: { fee: poolKey.fee, tick_spacing: poolKey.tickSpacing },
       },
       owner,
-      tickLower,
-      tickUpper,
+      toTick(tickLower),
+      toTick(tickUpper),
     );
     return {
       liquidity: BigInt(result.liquidity),

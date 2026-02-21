@@ -3,8 +3,10 @@ pub mod MockCoordinator {
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use starknet::{ContractAddress, get_caller_address};
     use crate::interfaces::coordinator::IVerifierCoordinator;
+    use crate::types::TickTrait;
     use crate::verifier::types::{
         SwapPublicInputs, MintPublicInputs, BurnPublicInputs, TICK_OFFSET,
+        offset_tick_to_signed,
     };
 
     #[storage]
@@ -53,6 +55,8 @@ pub mod MockCoordinator {
         fn verify_mint(
             ref self: ContractState, full_proof_with_hints: Span<felt252>,
         ) -> MintPublicInputs {
+            let tick_lower_offset = self.mock_tick_lower.read();
+            let tick_upper_offset = self.mock_tick_upper.read();
             MintPublicInputs {
                 change_commitment0: 0,
                 change_commitment1: 0,
@@ -60,21 +64,23 @@ pub mod MockCoordinator {
                 nullifier_hash0: 0,
                 nullifier_hash1: 0,
                 position_commitment: 0,
-                tick_lower: self.mock_tick_lower.read(),
-                tick_upper: self.mock_tick_upper.read(),
+                tick_lower: TickTrait::from_i32(offset_tick_to_signed(tick_lower_offset)),
+                tick_upper: TickTrait::from_i32(offset_tick_to_signed(tick_upper_offset)),
             }
         }
 
         fn verify_burn(
             ref self: ContractState, full_proof_with_hints: Span<felt252>,
         ) -> BurnPublicInputs {
+            let tick_lower_offset = self.mock_tick_lower.read();
+            let tick_upper_offset = self.mock_tick_upper.read();
             BurnPublicInputs {
                 root: 0,
                 position_nullifier_hash: 0,
                 new_commitment0: 0,
                 new_commitment1: 0,
-                tick_lower: self.mock_tick_lower.read(),
-                tick_upper: self.mock_tick_upper.read(),
+                tick_lower: TickTrait::from_i32(offset_tick_to_signed(tick_lower_offset)),
+                tick_upper: TickTrait::from_i32(offset_tick_to_signed(tick_upper_offset)),
             }
         }
 

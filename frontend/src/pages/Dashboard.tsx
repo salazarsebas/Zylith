@@ -17,7 +17,10 @@ export function Dashboard() {
   return (
     <PageContainer>
       <h1 className="text-2xl font-semibold text-text-display">Dashboard</h1>
-      <p className="mt-2 text-text-caption">Portfolio overview and shielded balances.</p>
+      <p className="mt-2 text-text-caption">
+        Overview of your private portfolio — shielded token balances and liquidity positions
+        stored as encrypted notes in your local vault.
+      </p>
 
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         {/* Shielded Balance */}
@@ -29,7 +32,9 @@ export function Dashboard() {
           {!isInitialized ? (
             <p className="text-sm text-text-disabled">Unlock vault to view balances.</p>
           ) : tokenEntries.length === 0 ? (
-            <p className="text-sm text-text-disabled">No shielded tokens yet.</p>
+            <p className="text-sm text-text-disabled">
+              No shielded tokens yet. Go to Shield to deposit tokens into the privacy pool.
+            </p>
           ) : (
             <div className="space-y-3">
               {tokenEntries.map(([token, amount]) => {
@@ -65,7 +70,9 @@ export function Dashboard() {
           {!isInitialized ? (
             <p className="text-sm text-text-disabled">Unlock vault to view positions.</p>
           ) : unspentPositions.length === 0 ? (
-            <p className="text-sm text-text-disabled">No active positions.</p>
+            <p className="text-sm text-text-disabled">
+              No active positions. Add shielded liquidity on the Pool page.
+            </p>
           ) : (
             <div className="space-y-2">
               {unspentPositions.map((pos) => (

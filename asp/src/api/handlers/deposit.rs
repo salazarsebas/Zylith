@@ -21,43 +21,46 @@ pub async fn deposit(
     // 1. Get next leaf index BEFORE insert (= current count)
     let leaf_index = state.db.get_leaf_count()?;
 
-    // 2. Submit deposit to coordinator on-chain
-    let relayer = state.relayer.lock().await;
-    let deposit_tx = relayer.deposit(&req.commitment).await?;
-    drop(relayer);
-
-    // 3. Insert leaf into local Merkle tree via worker
+    // 2. Insert leaf into local Merkle tree via worker
     let mut worker = state.worker.lock().await;
     let root = worker.insert_leaf(&commitment_decimal).await?;
     drop(worker);
 
-    // 4. Store commitment in DB
+    // 3. Store commitment in DB
     state
         .db
-        .insert_commitment(leaf_index, &commitment_decimal, Some(&deposit_tx))?;
+        .insert_commitment(leaf_index, &commitment_decimal, None)?;
 
-    // 5. Submit new Merkle root to coordinator
-    let relayer = state.relayer.lock().await;
-    let root_tx = relayer.submit_merkle_root(&root).await?;
-    drop(relayer);
-
-    // 6. Store root in DB
+    // 4. Store root in DB
     let new_count = leaf_index + 1;
-    state.db.insert_root(&root, new_count, Some(&root_tx))?;
+    state.db.insert_root(&root, new_count, None)?;
+
+    let root_hex = decimal_to_hex(&root);
+
+    // 5. Relay on-chain: deposit commitment + submit merkle root
+    if let Some(ref relayer) = state.relayer {
+        let relayer = relayer.lock().await;
+
+        let tx_hash = relayer.deposit(&commitment_decimal).await?;
+        tracing::info!(tx_hash = %tx_hash, "Deposit commitment submitted on-chain");
+
+        let root_tx = relayer.submit_merkle_root(&root).await?;
+        tracing::info!(tx_hash = %root_tx, "Merkle root submitted on-chain");
+    } else {
+        tracing::warn!("No relayer configured — deposit stored locally only");
+    }
 
     tracing::info!(
         leaf_index = leaf_index,
-        deposit_tx = %deposit_tx,
-        root_tx = %root_tx,
-        "Deposit confirmed"
+        root = %root_hex,
+        "Deposit processed successfully"
     );
 
     Ok(Json(DepositResponse {
         status: "confirmed".to_string(),
         leaf_index,
-        tx_hash: deposit_tx,
-        root: decimal_to_hex(&root),
-        root_tx_hash: root_tx,
+        calldata: vec![], // No user-side calldata needed — ASP relayed it
+        root: root_hex,
     }))
 }
 
