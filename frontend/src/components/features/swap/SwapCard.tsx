@@ -1,17 +1,20 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { Button } from "@/components/ui/Button";
 import { TokenSelector } from "@/components/features/shared/TokenSelector";
 import { ProofProgress } from "@/components/features/shared/ProofProgress";
 import { SwapConfirmModal } from "./SwapConfirmModal";
 import { useSwap } from "@/hooks/useSwap";
+import { usePoolState } from "@/hooks/usePoolState";
 import { usePoolOperations } from "@/hooks/usePoolOperations";
 import { useSdkStore } from "@/stores/sdkStore";
 import { TESTNET_TOKENS, type Token } from "@/config/tokens";
 import { parseTokenAmount, formatTokenAmount } from "@/lib/format";
+import { calculatePriceImpact, getPriceImpactVariant } from "@/lib/priceImpact";
 import { FEE_TIERS } from "@zylith/sdk";
-import type { Note } from "@zylith/sdk";
+import type { Note, PoolKey } from "@zylith/sdk";
 import { cn } from "@/lib/cn";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -77,6 +80,21 @@ export function SwapCard() {
   const parsedAmountIn = amountIn
     ? parseTokenAmount(amountIn, tokenIn?.decimals ?? 18)
     : 0n;
+
+  // Get pool state for price impact calculation
+  const poolKey: PoolKey | null = tokenIn && tokenOut ? {
+    token0: BigInt(tokenIn.address) < BigInt(tokenOut.address) ? tokenIn.address : tokenOut.address,
+    token1: BigInt(tokenIn.address) < BigInt(tokenOut.address) ? tokenOut.address : tokenIn.address,
+    fee: FEE_TIERS.MEDIUM.fee,
+    tickSpacing: FEE_TIERS.MEDIUM.tickSpacing,
+  } : null;
+  const { data: poolState } = usePoolState(poolKey);
+
+  // Calculate price impact
+  const priceImpact = useMemo(() => {
+    if (!poolState || parsedAmountIn === 0n) return 0;
+    return calculatePriceImpact(parsedAmountIn, poolState.liquidity);
+  }, [poolState, parsedAmountIn]);
 
   const canSwapPrivate =
     isInitialized &&
@@ -178,10 +196,10 @@ export function SwapCard() {
     <AnimatePresence mode="wait">
       <motion.span
         key={isPublic ? "public" : "private"}
-        initial={{ opacity: 0, filter: "blur(8px)", y: -2 }}
+        initial={{ opacity: 0, filter: "blur(12px)", y: -4 }}
         animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
-        exit={{ opacity: 0, filter: "blur(8px)", y: 2 }}
-        transition={{ duration: 0.2 }}
+        exit={{ opacity: 0, filter: "blur(12px)", y: 4 }}
+        transition={{ duration: 0.7, ease: [0.32, 0.72, 0, 1] }}
         className="inline-block"
       >
         {text}
@@ -266,6 +284,21 @@ export function SwapCard() {
               }}
             />
           </div>
+
+          {/* Price Impact Indicator */}
+          {parsedAmountIn > 0n && poolState && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-gradient-to-r from-surface-elevated/60 to-surface/20"
+            >
+              <span className="text-sm font-medium text-text-caption">Price Impact</span>
+              <Badge variant={getPriceImpactVariant(priceImpact)} className="px-3 py-1">
+                {priceImpact.toFixed(2)}%
+              </Badge>
+            </motion.div>
+          )}
 
           <div className="flex flex-col gap-6 pt-4 border-t border-white/5">
             {/* Privacy toggle */}
