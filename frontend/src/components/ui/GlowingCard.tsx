@@ -1,14 +1,14 @@
-import { motion, useMotionTemplate, useMotionValue } from "motion/react";
+import { HTMLMotionProps, motion, useMotionTemplate, useMotionValue } from "motion/react";
 import React from "react";
 import clsx from "clsx";
 
-interface GlowingCardProps {
+interface GlowingCardProps extends HTMLMotionProps<"div"> {
     children: React.ReactNode;
     className?: string;
     glowColor?: string; // e.g. "rgba(201, 169, 78, 0.4)"
 }
 
-export function GlowingCard({ children, className, glowColor = "rgba(201, 169, 78, 0.15)" }: GlowingCardProps) {
+export function GlowingCard({ children, className, glowColor = "rgba(201, 169, 78, 0.15)", ...props }: GlowingCardProps) {
     const mouseX = useMotionValue(0);
     const mouseY = useMotionValue(0);
 
@@ -29,11 +29,9 @@ export function GlowingCard({ children, className, glowColor = "rgba(201, 169, 7
                 className
             )}
             onMouseMove={handleMouseMove}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
             whileHover={{ scale: 1.01 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
+            {...props}
         >
             {/* Interactive hover glow bounded to the card */}
             <motion.div
@@ -56,3 +54,4 @@ export function GlowingCard({ children, className, glowColor = "rgba(201, 169, 7
         </motion.div>
     );
 }
+

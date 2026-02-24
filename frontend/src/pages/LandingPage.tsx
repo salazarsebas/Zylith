@@ -87,11 +87,17 @@ export function LandingPage() {
         </motion.section>
 
         {/* Bento Grid Features - PURE TYPOGRAPHY */}
-        <section className="mx-auto w-full max-w-6xl px-6 pb-32">
+        <motion.section
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          className="mx-auto w-full max-w-6xl px-6 pb-32"
+        >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-min">
 
             {/* Large Card (2 cols) */}
-            <GlowingCard className="md:col-span-2 p-10">
+            <GlowingCard variants={itemVariants} className="md:col-span-2 p-10">
               <h3 className="text-3xl font-bold tracking-tight text-text-display mb-4">Shielded Swaps</h3>
               <p className="text-lg text-text-caption max-w-lg leading-relaxed font-light">
                 Swap tokens privately using zero-knowledge proofs. Transaction volume and timing remain completely hidden from public observers.
@@ -99,7 +105,7 @@ export function LandingPage() {
             </GlowingCard>
 
             {/* Standard Card (1 col) */}
-            <GlowingCard className="p-10">
+            <GlowingCard variants={itemVariants} className="p-10">
               <h3 className="text-2xl font-bold tracking-tight text-text-display mb-4">Concentrated Liquidity</h3>
               <p className="text-base text-text-caption leading-relaxed font-light">
                 Deploy capital in custom price ranges for maximum efficiency within the privacy pool.
@@ -107,7 +113,7 @@ export function LandingPage() {
             </GlowingCard>
 
             {/* Standard Card (1 col) */}
-            <GlowingCard className="p-10">
+            <GlowingCard variants={itemVariants} className="p-10">
               <h3 className="text-2xl font-bold tracking-tight text-text-display mb-4">Mathematical Privacy</h3>
               <p className="text-base text-text-caption leading-relaxed font-light">
                 Groth16 proofs verified on-chain via Garaga BN254 pairing ensure unbreakable guarantees.
@@ -115,7 +121,7 @@ export function LandingPage() {
             </GlowingCard>
 
             {/* Wide Card (2 cols) */}
-            <GlowingCard className="md:col-span-2 p-10">
+            <GlowingCard variants={itemVariants} className="md:col-span-2 p-10">
               <h3 className="text-3xl font-bold tracking-tight text-text-display mb-4">Cairo Architecture</h3>
               <p className="text-lg text-text-caption max-w-lg leading-relaxed font-light">
                 Built on Starknet. Leveraging heavily optimized smart contracts with Poseidon commitments and highly-efficient Merkle trees.
@@ -123,14 +129,20 @@ export function LandingPage() {
             </GlowingCard>
 
           </div>
-        </section>
+        </motion.section>
 
         {/* Footer */}
-        <footer className="border-t border-border/50 bg-surface/30 backdrop-blur-md py-10 text-center w-full">
+        <motion.footer
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="border-t border-border/50 bg-surface/30 backdrop-blur-md py-10 text-center w-full"
+        >
           <p className="text-sm font-medium tracking-wide text-text-caption">
             Zylith Protocol
           </p>
-        </footer>
+        </motion.footer>
       </div>
     </div>
   );
