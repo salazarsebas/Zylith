@@ -59,10 +59,10 @@ export function SnakeButton({
 
             {/* The inner button surface */}
             <span className={cn(
-                "relative z-10 w-full h-full inline-flex items-center justify-center rounded-[11px] px-8 py-4 text-base backdrop-blur-3xl transition-colors",
+                "relative z-10 w-full h-full inline-flex items-center justify-center rounded-[11px] px-8 py-4 text-base transition-colors",
                 primary
-                    ? "bg-surface-elevated font-semibold text-text-display group-hover:bg-surface-elevated/90"
-                    : "bg-surface font-medium text-text-body group-hover:text-text-display group-hover:bg-surface-elevated"
+                    ? "bg-[#18181B] font-semibold text-text-display group-hover:bg-[#18181B]" /* Solid surface-elevated */
+                    : "bg-[#111113] font-medium text-text-body group-hover:text-text-display group-hover:bg-[#18181B]" /* Solid surface -> elevated */
             )}>
                 {children}
             </span>
