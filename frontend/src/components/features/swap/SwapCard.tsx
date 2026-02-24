@@ -1,18 +1,22 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { Button } from "@/components/ui/Button";
-import { ShieldIcon } from "@/components/ui/ShieldIcon";
 import { TokenSelector } from "@/components/features/shared/TokenSelector";
 import { ProofProgress } from "@/components/features/shared/ProofProgress";
 import { SwapConfirmModal } from "./SwapConfirmModal";
 import { useSwap } from "@/hooks/useSwap";
+import { usePoolState } from "@/hooks/usePoolState";
 import { usePoolOperations } from "@/hooks/usePoolOperations";
 import { useSdkStore } from "@/stores/sdkStore";
 import { TESTNET_TOKENS, type Token } from "@/config/tokens";
 import { parseTokenAmount, formatTokenAmount } from "@/lib/format";
+import { calculatePriceImpact, getPriceImpactVariant } from "@/lib/priceImpact";
 import { FEE_TIERS } from "@zylith/sdk";
-import type { Note } from "@zylith/sdk";
+import type { Note, PoolKey } from "@zylith/sdk";
+import { cn } from "@/lib/cn";
+import { motion, AnimatePresence } from "motion/react";
 
 interface SwapTransaction {
   txHash: string;
@@ -76,6 +80,21 @@ export function SwapCard() {
   const parsedAmountIn = amountIn
     ? parseTokenAmount(amountIn, tokenIn?.decimals ?? 18)
     : 0n;
+
+  // Get pool state for price impact calculation
+  const poolKey: PoolKey | null = tokenIn && tokenOut ? {
+    token0: BigInt(tokenIn.address) < BigInt(tokenOut.address) ? tokenIn.address : tokenOut.address,
+    token1: BigInt(tokenIn.address) < BigInt(tokenOut.address) ? tokenOut.address : tokenIn.address,
+    fee: FEE_TIERS.MEDIUM.fee,
+    tickSpacing: FEE_TIERS.MEDIUM.tickSpacing,
+  } : null;
+  const { data: poolState } = usePoolState(poolKey);
+
+  // Calculate price impact
+  const priceImpact = useMemo(() => {
+    if (!poolState || parsedAmountIn === 0n) return 0;
+    return calculatePriceImpact(parsedAmountIn, poolState.liquidity);
+  }, [poolState, parsedAmountIn]);
 
   const canSwapPrivate =
     isInitialized &&
@@ -173,105 +192,160 @@ export function SwapCard() {
     }
   };
 
+  const BlurFadeText = ({ text, isPublic }: { text: string; isPublic: boolean }) => (
+    <AnimatePresence mode="wait">
+      <motion.span
+        key={isPublic ? "public" : "private"}
+        initial={{ opacity: 0, filter: "blur(12px)", y: -4 }}
+        animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+        exit={{ opacity: 0, filter: "blur(12px)", y: 4 }}
+        transition={{ duration: 0.7, ease: [0.32, 0.72, 0, 1] }}
+        className="inline-block"
+      >
+        {text}
+      </motion.span>
+    </AnimatePresence>
+  );
+
   return (
-    <div className="space-y-4">
-      <Card className="space-y-4">
-        <div className="flex items-center gap-2">
-          <ShieldIcon size={18} className={usePublicSwap ? "text-text-disabled" : "text-gold"} />
-          <h2 className="text-base font-medium text-text-heading">
-            {usePublicSwap ? "Public Swap" : "Shielded Swap"}
-          </h2>
-        </div>
-        <p className="text-xs text-text-caption">
-          {usePublicSwap
-            ? "Standard on-chain swap — visible to everyone. Tokens are swapped directly from your wallet."
-            : "Private swap using zero-knowledge proofs. Spends a shielded note and produces a new one — no one can see what you traded."}
-        </p>
+    <div className="space-y-6 w-full max-w-lg mx-auto">
+      {/* Animated Snake Border Wrapper */}
+      <div className="relative group overflow-hidden rounded-[24px] p-[1px] transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gold/5">
 
-        {/* Token In */}
-        <AmountInput
-          label="You pay"
-          placeholder="0.0"
-          value={amountIn}
-          onChange={(e) => setAmountIn(e.target.value)}
-          tokenAddress={tokenIn?.address}
-          balance={formatTokenAmount(tokenInBalance, tokenIn?.decimals ?? 18)}
-          onMax={() =>
-            setAmountIn(formatTokenAmount(tokenInBalance, tokenIn?.decimals ?? 18))
-          }
-          onTokenClick={() => {
-            setSelectingTokenType("in");
-            setShowTokenSelector(true);
-          }}
-        />
+        {/* Spinning background gradient tail */}
+        <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] opacity-0 transition-opacity duration-500 group-hover:opacity-100 bg-[conic-gradient(from_90deg_at_50%_50%,transparent_0%,transparent_75%,#A1A1AA_100%)] pointer-events-none" />
 
-        {/* Flip button */}
-        <div className="flex justify-center -my-1">
-          <button
-            onClick={handleFlip}
-            className="rounded-full border border-border bg-surface p-2 transition-colors hover:border-text-disabled hover:bg-surface-elevated"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M8 3v10M5 10l3 3 3-3"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-text-caption"
-              />
-            </svg>
-          </button>
-        </div>
+        {/* Static boundary when not hovering */}
+        <span className="absolute inset-0 rounded-[24px] border border-white/5 transition-opacity duration-300 pointer-events-none group-hover:opacity-0" />
 
-        {/* Token Out */}
-        <AmountInput
-          label="You receive"
-          placeholder="0.0"
-          readOnly
-          value="—"
-          tokenAddress={tokenOut?.address}
-          onTokenClick={() => {
-            setSelectingTokenType("out");
-            setShowTokenSelector(true);
-          }}
-        />
-
-        {/* Privacy toggle */}
-        <div className="flex items-center justify-between rounded-lg border border-border bg-surface-elevated p-3">
-          <div className="flex items-center gap-2">
-            <ShieldIcon size={14} className={usePublicSwap ? "text-text-disabled" : "text-gold"} />
-            <span className="text-xs text-text-caption">
-              {usePublicSwap ? "Public swap (visible on-chain)" : "Private swap (zero-knowledge)"}
-            </span>
+        {/* Inner Solid Card Body */}
+        <div className="relative z-10 flex flex-col gap-6 bg-[#0a0a0c] p-6 sm:p-8 rounded-[23px] w-full h-full">
+          <div className="flex items-center justify-between pb-4 border-b border-white/5">
+            <h2 className="text-xl font-bold tracking-tight text-text-display">
+              <BlurFadeText text={usePublicSwap ? "Public Swap" : "Shielded Swap"} isPublic={usePublicSwap} />
+            </h2>
+            <div className="flex items-center gap-2">
+              <span className={cn(
+                "w-2 h-2 rounded-full",
+                usePublicSwap ? "bg-signal-warning" : "bg-gold animate-pulse"
+              )} />
+              <span className="text-xs font-semibold tracking-widest uppercase text-text-caption">
+                {usePublicSwap ? "Public" : "Private"}
+              </span>
+            </div>
           </div>
-          <button
-            onClick={() => setUsePublicSwap(!usePublicSwap)}
-            className="text-xs text-gold hover:text-gold/80"
-          >
-            {usePublicSwap ? "Enable Privacy" : "Disable Privacy"}
-          </button>
+
+          <div className="relative z-10 flex flex-col gap-2">
+            {/* Token In */}
+            <AmountInput
+              label="You pay"
+              placeholder="0.0"
+              value={amountIn}
+              onChange={(e) => setAmountIn(e.target.value)}
+              tokenAddress={tokenIn?.address}
+              balance={formatTokenAmount(tokenInBalance, tokenIn?.decimals ?? 18)}
+              onMax={() =>
+                setAmountIn(formatTokenAmount(tokenInBalance, tokenIn?.decimals ?? 18))
+              }
+              onTokenClick={() => {
+                setSelectingTokenType("in");
+                setShowTokenSelector(true);
+              }}
+            />
+
+            {/* Premium Flip button */}
+            <div className="flex justify-center -my-5 relative z-20">
+              <button
+                onClick={handleFlip}
+                className="group flex flex-shrink-0 items-center justify-center w-12 h-12 rounded-full border border-white/10 bg-surface/80 backdrop-blur-md shadow-lg transition-all duration-300 hover:scale-110 hover:border-gold/30 hover:bg-surface-elevated hover:shadow-[0_0_20px_rgba(201,169,78,0.2)]"
+              >
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="none" className="text-text-caption group-hover:text-gold transition-colors duration-300">
+                  <path
+                    d="M8 3v10M5 10l3 3 3-3"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Token Out */}
+            <AmountInput
+              label="You receive"
+              placeholder="0.0"
+              readOnly
+              value="—"
+              tokenAddress={tokenOut?.address}
+              onTokenClick={() => {
+                setSelectingTokenType("out");
+                setShowTokenSelector(true);
+              }}
+            />
+          </div>
+
+          {/* Price Impact Indicator */}
+          {parsedAmountIn > 0n && poolState && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-gradient-to-r from-surface-elevated/60 to-surface/20"
+            >
+              <span className="text-sm font-medium text-text-caption">Price Impact</span>
+              <Badge variant={getPriceImpactVariant(priceImpact)} className="px-3 py-1">
+                {priceImpact.toFixed(2)}%
+              </Badge>
+            </motion.div>
+          )}
+
+          <div className="flex flex-col gap-6 pt-4 border-t border-white/5">
+            {/* Privacy toggle */}
+            <div className="flex items-center justify-between rounded-xl border border-white/5 bg-gradient-to-r from-surface-elevated/80 to-surface/30 p-5 transition-all duration-300 hover:border-gold/20">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-bold text-text-heading">
+                  <BlurFadeText text={usePublicSwap ? "Public Engine" : "Zero-Knowledge Engine"} isPublic={usePublicSwap} />
+                </span>
+                <span className="text-xs text-text-caption font-medium">
+                  <BlurFadeText text={usePublicSwap ? "Visible on Sepolia" : "100% Cryptographic Privacy"} isPublic={usePublicSwap} />
+                </span>
+              </div>
+              <button
+                onClick={() => setUsePublicSwap(!usePublicSwap)}
+                className="px-5 py-2.5 rounded-lg text-xs font-bold tracking-widest uppercase transition-all bg-surface-elevated border border-white/10 hover:border-gold/40 hover:text-gold hover:shadow-[0_0_15px_rgba(201,169,78,0.15)]"
+              >
+                {usePublicSwap ? "Shield" : "Unshield"}
+              </button>
+            </div>
+
+            {!usePublicSwap && parsedAmountIn > 0n && !selectedNote && (
+              <div className="p-4 rounded-xl bg-signal-error/10 border border-signal-error/20">
+                <p className="text-sm text-signal-error font-medium text-center">
+                  No shielded note with sufficient balance. Shield tokens first on the Shield page.
+                </p>
+              </div>
+            )}
+
+            {poolOps.error && (
+              <div className="p-4 rounded-xl bg-signal-error/10 border border-signal-error/20">
+                <p className="text-sm text-signal-error font-medium text-center">{poolOps.error}</p>
+              </div>
+            )}
+
+            <div>
+              <Button
+                variant="primary"
+                className="w-full h-16 text-lg font-bold tracking-widest uppercase shadow-lg shadow-gold/20"
+                disabled={usePublicSwap ? !canSwapPublic : !canSwapPrivate}
+                onClick={() => setShowConfirm(true)}
+              >
+                <BlurFadeText text={usePublicSwap ? "Execute Swap" : "Execute Shielded Swap"} isPublic={usePublicSwap} />
+              </Button>
+            </div>
+          </div>
         </div>
-
-        {!usePublicSwap && parsedAmountIn > 0n && !selectedNote && (
-          <p className="text-xs text-signal-error">
-            No shielded note with sufficient balance. Shield tokens first on the Shield page.
-          </p>
-        )}
-
-        {poolOps.error && (
-          <p className="text-xs text-signal-error">{poolOps.error}</p>
-        )}
-
-        <Button
-          variant="primary"
-          className="w-full"
-          disabled={usePublicSwap ? !canSwapPublic : !canSwapPrivate}
-          onClick={() => setShowConfirm(true)}
-        >
-          {usePublicSwap ? "Swap" : "Shielded Swap"}
-        </Button>
-      </Card>
+      </div>
 
       <SwapConfirmModal
         open={showConfirm}
@@ -299,44 +373,48 @@ export function SwapCard() {
 
       <ProofProgress open={swap.isPending} label="Shielded Swap" />
 
-      {recentSwaps.length > 0 && (
-        <Card className="space-y-3">
-          <h3 className="text-sm font-medium text-text-heading">Recent Swaps</h3>
-          <div className="space-y-2">
-            {recentSwaps.map((tx) => (
-              <div
-                key={tx.txHash}
-                className="flex items-center justify-between p-3 rounded-lg border border-border bg-surface-elevated"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-text-body font-medium">
-                      {tx.amountIn} {tx.tokenIn} → {tx.tokenOut}
-                    </p>
-                    {tx.isPrivate && (
-                      <ShieldIcon size={12} className="text-gold" />
-                    )}
-                  </div>
-                  <p className="text-xs text-text-caption mt-0.5">
-                    {new Date(tx.timestamp).toLocaleString()}
-                  </p>
-                </div>
-                <a
-                  href={`https://sepolia.voyager.online/tx/${tx.txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-gold hover:underline flex items-center gap-1"
+      {
+        recentSwaps.length > 0 && (
+          <Card className="space-y-4 bg-[#0a0a0c]/80 backdrop-blur-3xl border border-white/10 p-6 sm:p-8 rounded-[24px] shadow-2xl mt-8">
+            <h3 className="text-sm font-semibold tracking-widest uppercase text-text-caption">Recent Transactions</h3>
+            <div className="space-y-3">
+              {recentSwaps.map((tx) => (
+                <div
+                  key={tx.txHash}
+                  className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-white/5 bg-gradient-to-br from-surface-elevated/80 to-surface/30 transition-all duration-300 hover:border-gold/30"
                 >
-                  View on Voyager
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </a>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-    </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      <p className="text-base text-text-display font-bold tracking-tight">
+                        {tx.amountIn} <span className="text-text-caption font-medium mx-1">{tx.tokenIn}</span> → <span className="text-text-caption font-medium mx-1">{tx.tokenOut}</span>
+                      </p>
+                      {tx.isPrivate && (
+                        <span className="px-2 py-0.5 rounded-full bg-gold/10 border border-gold/20 text-[10px] uppercase tracking-widest text-gold font-bold">
+                          Shielded
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-text-disabled mt-1">
+                      {new Date(tx.timestamp).toLocaleString()}
+                    </p>
+                  </div>
+                  <a
+                    href={`https://sepolia.voyager.online/tx/${tx.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 sm:mt-0 text-xs font-semibold tracking-widest uppercase text-gold hover:text-white transition-colors flex items-center gap-1.5"
+                  >
+                    Voyager
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )
+      }
+    </div >
   );
 }
