@@ -175,7 +175,7 @@ export function SwapCard() {
 
   return (
     <div className="space-y-6 w-full max-w-lg mx-auto">
-      <Card animated className="flex flex-col gap-8 bg-surface/40 backdrop-blur-xl border-white/5 py-4">
+      <Card className="flex flex-col gap-6 bg-[#0a0a0c]/80 backdrop-blur-3xl border border-white/10 p-6 sm:p-8 rounded-[24px] shadow-2xl">
         <div className="flex items-center justify-between pb-4 border-b border-white/5">
           <h2 className="text-xl font-bold tracking-tight text-text-display">
             {usePublicSwap ? "Public Swap" : "Shielded Swap"}
@@ -191,7 +191,7 @@ export function SwapCard() {
           </div>
         </div>
 
-        <div className="relative z-10 flex flex-col gap-4">
+        <div className="relative z-10 flex flex-col gap-2">
           {/* Token In */}
           <AmountInput
             label="You pay"
@@ -210,17 +210,16 @@ export function SwapCard() {
           />
 
           {/* Premium Flip button */}
-          <div className="flex justify-center -my-6 relative z-20">
+          <div className="flex justify-center -my-5 relative z-20">
             <button
               onClick={handleFlip}
-              className="group relative flex items-center justify-center w-14 h-14 rounded-full border-[4px] border-[#18181B] bg-surface-elevated shadow-xl transition-all duration-300 hover:scale-110 hover:border-[#18181B]/80 hover:shadow-[0_0_25px_rgba(201,169,78,0.25)] overflow-hidden"
+              className="group flex flex-shrink-0 items-center justify-center w-12 h-12 rounded-full border border-white/10 bg-surface/80 backdrop-blur-md shadow-lg transition-all duration-300 hover:scale-110 hover:border-gold/30 hover:bg-surface-elevated hover:shadow-[0_0_20px_rgba(201,169,78,0.2)]"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <svg width="22" height="22" viewBox="0 0 16 16" fill="none" className="text-text-caption group-hover:text-gold transition-colors duration-300">
+              <svg width="20" height="20" viewBox="0 0 16 16" fill="none" className="text-text-caption group-hover:text-gold transition-colors duration-300">
                 <path
                   d="M8 3v10M5 10l3 3 3-3"
                   stroke="currentColor"
-                  strokeWidth="2.5"
+                  strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
@@ -315,7 +314,7 @@ export function SwapCard() {
       <ProofProgress open={swap.isPending} label="Shielded Swap" />
 
       {recentSwaps.length > 0 && (
-        <Card animated className="space-y-4 bg-surface/40 backdrop-blur-xl border-white/5 mt-8">
+        <Card className="space-y-4 bg-[#0a0a0c]/80 backdrop-blur-3xl border border-white/10 p-6 sm:p-8 rounded-[24px] shadow-2xl mt-8">
           <h3 className="text-sm font-semibold tracking-widest uppercase text-text-caption">Recent Transactions</h3>
           <div className="space-y-3">
             {recentSwaps.map((tx) => (
