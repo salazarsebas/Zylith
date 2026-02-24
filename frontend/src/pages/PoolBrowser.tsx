@@ -1,11 +1,8 @@
-import { useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { usePoolState } from "@/hooks/usePoolState";
-import { TESTNET_TOKENS, type Token } from "@/config/tokens";
+import { TESTNET_TOKENS } from "@/config/tokens";
 import { FEE_TIERS } from "@zylith/sdk";
 import type { PoolKey } from "@zylith/sdk";
 

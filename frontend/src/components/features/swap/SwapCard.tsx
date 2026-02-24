@@ -176,7 +176,7 @@ export function SwapCard() {
     <div className="space-y-4">
       <Card className="space-y-4">
         <div className="flex items-center gap-2">
-          
+
           <h2 className="text-base font-medium text-text-heading">
             {usePublicSwap ? "Public Swap" : "Shielded Swap"}
           </h2>
@@ -239,7 +239,7 @@ export function SwapCard() {
         {/* Privacy toggle */}
         <div className="flex items-center justify-between rounded-lg border border-border bg-surface-elevated p-3">
           <div className="flex items-center gap-2">
-            
+
             <span className="text-xs text-text-caption">
               {usePublicSwap ? "Public swap (visible on-chain)" : "Private swap (zero-knowledge)"}
             </span>
@@ -313,7 +313,7 @@ export function SwapCard() {
                       {tx.amountIn} {tx.tokenIn} → {tx.tokenOut}
                     </p>
                     {tx.isPrivate && (
-                      
+                      <span className="text-xs text-gold">Shielded</span>
                     )}
                   </div>
                   <p className="text-xs text-text-caption mt-0.5">
