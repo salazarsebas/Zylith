@@ -41,6 +41,11 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(
             autoComplete="off"
             className="h-16 flex-1 bg-transparent px-5 text-2xl font-bold text-text-display placeholder:text-text-disabled/40 focus:outline-none min-w-0"
             {...props}
+            onChange={(e) => {
+              if (e.target.value === "" || /^\d*\.?\d*$/.test(e.target.value)) {
+                props.onChange?.(e);
+              }
+            }}
           />
           <div className="flex shrink-0 items-center gap-3 pr-4">
             {onMax && (
