@@ -2,6 +2,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { TokenIcon } from "@/components/ui/TokenIcon";
+import { TotalEarningsCard } from "@/components/features/liquidity/TotalEarningsCard";
 import { useSdkStore } from "@/stores/sdkStore";
 import { getTokenSymbol, TESTNET_TOKENS } from "@/config/tokens";
 import { formatTokenAmount } from "@/lib/format";
@@ -75,7 +76,7 @@ export function Dashboard() {
             )}
           </motion.div>
 
-          <div className="grid gap-8 lg:grid-cols-2">
+          <div className="grid gap-8 lg:grid-cols-2 xl:grid-cols-3">
             {/* Shielded Balance Widget */}
             <motion.div variants={itemVariants}>
               <Card animated className="h-full border-white/5 bg-surface/40 backdrop-blur-xl">
@@ -176,6 +177,11 @@ export function Dashboard() {
                   </div>
                 )}
               </Card>
+            </motion.div>
+
+            {/* Fee Earnings Widget */}
+            <motion.div variants={itemVariants}>
+              <TotalEarningsCard />
             </motion.div>
           </div>
         </motion.div>
