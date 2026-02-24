@@ -13,6 +13,7 @@ import { parseTokenAmount, formatTokenAmount } from "@/lib/format";
 import { FEE_TIERS } from "@zylith/sdk";
 import type { Note } from "@zylith/sdk";
 import { cn } from "@/lib/cn";
+import { motion, AnimatePresence } from "motion/react";
 
 interface SwapTransaction {
   txHash: string;
@@ -173,6 +174,21 @@ export function SwapCard() {
     }
   };
 
+  const BlurFadeText = ({ text, isPublic }: { text: string; isPublic: boolean }) => (
+    <AnimatePresence mode="wait">
+      <motion.span
+        key={isPublic ? "public" : "private"}
+        initial={{ opacity: 0, filter: "blur(8px)", y: -2 }}
+        animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+        exit={{ opacity: 0, filter: "blur(8px)", y: 2 }}
+        transition={{ duration: 0.2 }}
+        className="inline-block"
+      >
+        {text}
+      </motion.span>
+    </AnimatePresence>
+  );
+
   return (
     <div className="space-y-6 w-full max-w-lg mx-auto">
       {/* Animated Snake Border Wrapper */}
@@ -188,7 +204,7 @@ export function SwapCard() {
         <div className="relative z-10 flex flex-col gap-6 bg-[#0a0a0c] p-6 sm:p-8 rounded-[23px] w-full h-full">
           <div className="flex items-center justify-between pb-4 border-b border-white/5">
             <h2 className="text-xl font-bold tracking-tight text-text-display">
-              {usePublicSwap ? "Public Swap" : "Shielded Swap"}
+              <BlurFadeText text={usePublicSwap ? "Public Swap" : "Shielded Swap"} isPublic={usePublicSwap} />
             </h2>
             <div className="flex items-center gap-2">
               <span className={cn(
@@ -256,10 +272,10 @@ export function SwapCard() {
             <div className="flex items-center justify-between rounded-xl border border-white/5 bg-gradient-to-r from-surface-elevated/80 to-surface/30 p-5 transition-all duration-300 hover:border-gold/20">
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-bold text-text-heading">
-                  {usePublicSwap ? "Public Engine" : "Zero-Knowledge Engine"}
+                  <BlurFadeText text={usePublicSwap ? "Public Engine" : "Zero-Knowledge Engine"} isPublic={usePublicSwap} />
                 </span>
                 <span className="text-xs text-text-caption font-medium">
-                  {usePublicSwap ? "Visible on Sepolia" : "100% Cryptographic Privacy"}
+                  <BlurFadeText text={usePublicSwap ? "Visible on Sepolia" : "100% Cryptographic Privacy"} isPublic={usePublicSwap} />
                 </span>
               </div>
               <button
@@ -291,7 +307,7 @@ export function SwapCard() {
                 disabled={usePublicSwap ? !canSwapPublic : !canSwapPrivate}
                 onClick={() => setShowConfirm(true)}
               >
-                {usePublicSwap ? "Execute Swap" : "Execute Shielded Swap"}
+                <BlurFadeText text={usePublicSwap ? "Execute Swap" : "Execute Shielded Swap"} isPublic={usePublicSwap} />
               </Button>
             </div>
           </div>
