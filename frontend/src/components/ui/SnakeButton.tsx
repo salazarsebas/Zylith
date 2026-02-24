@@ -41,7 +41,12 @@ export function SnakeButton({
         It is large enough to cover the button while rotating.
         Hidden by default, shown on group-hover.
       */}
-            <span className="absolute inset-[-1000%] animate-[spin_2s_linear_infinite] opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[conic-gradient(from_90deg_at_50%_50%,#09090B_0%,#C9A94E_50%,#09090B_100%)]" />
+            <span className={cn(
+                "absolute inset-[-1000%] animate-[spin_2.5s_linear_infinite] opacity-0 transition-opacity duration-300 group-hover:opacity-100",
+                primary
+                    ? "bg-[conic-gradient(from_90deg_at_50%_50%,transparent_0%,transparent_75%,#C9A94E_100%)]"
+                    : "bg-[conic-gradient(from_90deg_at_50%_50%,transparent_0%,transparent_75%,#A1A1AA_100%)]"
+            )} />
 
             {/* 
         The static border (when not hovering).
