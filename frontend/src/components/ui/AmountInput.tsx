@@ -15,22 +15,22 @@ interface AmountInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "
 export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(
   ({ tokenAddress, balance, error, label, onMax, onTokenClick, className, ...props }, ref) => {
     return (
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {label && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-text-caption">{label}</span>
+          <div className="flex items-center justify-between px-1">
+            <span className="text-sm font-semibold tracking-wide text-text-caption uppercase">{label}</span>
             {balance !== undefined && (
-              <span className="text-xs text-text-caption">
-                Balance: {balance}
+              <span className="text-xs font-medium text-text-disabled">
+                Balance: <span className="text-text-body">{balance}</span>
               </span>
             )}
           </div>
         )}
         <div
           className={cn(
-            "flex items-center rounded-lg border bg-surface transition-colors duration-150",
-            "focus-within:border-gold",
-            error ? "border-signal-error" : "border-border",
+            "group flex items-center rounded-2xl border bg-surface/40 backdrop-blur-xl transition-all duration-300",
+            "focus-within:bg-surface/60 focus-within:border-gold/50 focus-within:shadow-[0_0_20px_rgba(201,169,78,0.1)]",
+            error ? "border-signal-error" : "border-white/5 hover:border-white/10",
             className
           )}
         >
@@ -39,15 +39,15 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(
             type="text"
             inputMode="decimal"
             autoComplete="off"
-            className="h-14 flex-1 bg-transparent px-4 text-lg font-medium text-text-display placeholder:text-text-disabled focus:outline-none"
+            className="h-16 flex-1 bg-transparent px-5 text-2xl font-bold text-text-display placeholder:text-text-disabled/40 focus:outline-none"
             {...props}
           />
-          <div className="flex items-center gap-2 pr-3">
+          <div className="flex items-center gap-3 pr-4">
             {onMax && (
               <button
                 type="button"
                 onClick={onMax}
-                className="rounded px-1.5 py-0.5 text-xs font-medium text-gold hover:bg-gold/10 transition-colors"
+                className="rounded-lg px-2.5 py-1 text-xs font-bold tracking-widest text-gold hover:bg-gold/10 hover:text-gold-light transition-colors"
               >
                 MAX
               </button>
@@ -58,25 +58,27 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(
                 onClick={onTokenClick}
                 disabled={!onTokenClick}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-full bg-surface-elevated border border-border px-2.5 py-1",
-                  onTokenClick && "cursor-pointer hover:border-gold hover:bg-gold/5 transition-colors",
-                  !onTokenClick && "cursor-default"
+                  "flex items-center gap-2 rounded-xl bg-surface-elevated/80 border border-white/5 shadow-inner px-3 py-1.5 transition-all duration-300",
+                  onTokenClick && "cursor-pointer hover:border-gold/30 hover:bg-surface-elevated",
+                  !onTokenClick && "cursor-default opacity-80"
                 )}
               >
-                <TokenIcon address={tokenAddress} size="sm" />
-                <span className="text-sm font-medium text-text-heading">
+                <div className="p-0.5 bg-surface rounded-full shadow-sm">
+                  <TokenIcon address={tokenAddress} size="sm" />
+                </div>
+                <span className="text-base font-bold text-text-heading">
                   {getTokenSymbol(tokenAddress)}
                 </span>
                 {onTokenClick && (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-text-caption">
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-text-caption ml-1">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
               </button>
             )}
           </div>
         </div>
-        {error && <p className="text-xs text-signal-error">{error}</p>}
+        {error && <p className="text-xs text-signal-error pl-1">{error}</p>}
       </div>
     );
   }

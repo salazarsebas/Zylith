@@ -12,6 +12,7 @@ import { TESTNET_TOKENS, type Token } from "@/config/tokens";
 import { parseTokenAmount, formatTokenAmount } from "@/lib/format";
 import { FEE_TIERS } from "@zylith/sdk";
 import type { Note } from "@zylith/sdk";
+import { cn } from "@/lib/cn";
 
 interface SwapTransaction {
   txHash: string;
@@ -173,103 +174,118 @@ export function SwapCard() {
   };
 
   return (
-    <div className="space-y-4">
-      <Card className="space-y-4">
-        <div className="flex items-center gap-2">
-
-          <h2 className="text-base font-medium text-text-heading">
+    <div className="space-y-6 w-full max-w-lg mx-auto">
+      <Card animated className="flex flex-col gap-8 bg-surface/40 backdrop-blur-xl border-white/5 py-4">
+        <div className="flex items-center justify-between pb-4 border-b border-white/5">
+          <h2 className="text-xl font-bold tracking-tight text-text-display">
             {usePublicSwap ? "Public Swap" : "Shielded Swap"}
           </h2>
-        </div>
-        <p className="text-xs text-text-caption">
-          {usePublicSwap
-            ? "Standard on-chain swap — visible to everyone. Tokens are swapped directly from your wallet."
-            : "Private swap using zero-knowledge proofs. Spends a shielded note and produces a new one — no one can see what you traded."}
-        </p>
-
-        {/* Token In */}
-        <AmountInput
-          label="You pay"
-          placeholder="0.0"
-          value={amountIn}
-          onChange={(e) => setAmountIn(e.target.value)}
-          tokenAddress={tokenIn?.address}
-          balance={formatTokenAmount(tokenInBalance, tokenIn?.decimals ?? 18)}
-          onMax={() =>
-            setAmountIn(formatTokenAmount(tokenInBalance, tokenIn?.decimals ?? 18))
-          }
-          onTokenClick={() => {
-            setSelectingTokenType("in");
-            setShowTokenSelector(true);
-          }}
-        />
-
-        {/* Flip button */}
-        <div className="flex justify-center -my-1">
-          <button
-            onClick={handleFlip}
-            className="rounded-full border border-border bg-surface p-2 transition-colors hover:border-text-disabled hover:bg-surface-elevated"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M8 3v10M5 10l3 3 3-3"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-text-caption"
-              />
-            </svg>
-          </button>
-        </div>
-
-        {/* Token Out */}
-        <AmountInput
-          label="You receive"
-          placeholder="0.0"
-          readOnly
-          value="—"
-          tokenAddress={tokenOut?.address}
-          onTokenClick={() => {
-            setSelectingTokenType("out");
-            setShowTokenSelector(true);
-          }}
-        />
-
-        {/* Privacy toggle */}
-        <div className="flex items-center justify-between rounded-lg border border-border bg-surface-elevated p-3">
           <div className="flex items-center gap-2">
-
-            <span className="text-xs text-text-caption">
-              {usePublicSwap ? "Public swap (visible on-chain)" : "Private swap (zero-knowledge)"}
+            <span className={cn(
+              "w-2 h-2 rounded-full",
+              usePublicSwap ? "bg-signal-warning" : "bg-gold animate-pulse"
+            )} />
+            <span className="text-xs font-semibold tracking-widest uppercase text-text-caption">
+              {usePublicSwap ? "Public" : "Private"}
             </span>
           </div>
-          <button
-            onClick={() => setUsePublicSwap(!usePublicSwap)}
-            className="text-xs text-gold hover:text-gold/80"
-          >
-            {usePublicSwap ? "Enable Privacy" : "Disable Privacy"}
-          </button>
         </div>
 
-        {!usePublicSwap && parsedAmountIn > 0n && !selectedNote && (
-          <p className="text-xs text-signal-error">
-            No shielded note with sufficient balance. Shield tokens first on the Shield page.
-          </p>
-        )}
+        <div className="relative z-10 flex flex-col gap-4">
+          {/* Token In */}
+          <AmountInput
+            label="You pay"
+            placeholder="0.0"
+            value={amountIn}
+            onChange={(e) => setAmountIn(e.target.value)}
+            tokenAddress={tokenIn?.address}
+            balance={formatTokenAmount(tokenInBalance, tokenIn?.decimals ?? 18)}
+            onMax={() =>
+              setAmountIn(formatTokenAmount(tokenInBalance, tokenIn?.decimals ?? 18))
+            }
+            onTokenClick={() => {
+              setSelectingTokenType("in");
+              setShowTokenSelector(true);
+            }}
+          />
 
-        {poolOps.error && (
-          <p className="text-xs text-signal-error">{poolOps.error}</p>
-        )}
+          {/* Premium Flip button */}
+          <div className="flex justify-center -my-6 relative z-20">
+            <button
+              onClick={handleFlip}
+              className="group relative flex items-center justify-center w-14 h-14 rounded-full border-[4px] border-[#18181B] bg-surface-elevated shadow-xl transition-all duration-300 hover:scale-110 hover:border-[#18181B]/80 hover:shadow-[0_0_25px_rgba(201,169,78,0.25)] overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <svg width="22" height="22" viewBox="0 0 16 16" fill="none" className="text-text-caption group-hover:text-gold transition-colors duration-300">
+                <path
+                  d="M8 3v10M5 10l3 3 3-3"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
 
-        <Button
-          variant="primary"
-          className="w-full"
-          disabled={usePublicSwap ? !canSwapPublic : !canSwapPrivate}
-          onClick={() => setShowConfirm(true)}
-        >
-          {usePublicSwap ? "Swap" : "Shielded Swap"}
-        </Button>
+          {/* Token Out */}
+          <AmountInput
+            label="You receive"
+            placeholder="0.0"
+            readOnly
+            value="—"
+            tokenAddress={tokenOut?.address}
+            onTokenClick={() => {
+              setSelectingTokenType("out");
+              setShowTokenSelector(true);
+            }}
+          />
+        </div>
+
+        <div className="flex flex-col gap-6 pt-4 border-t border-white/5">
+          {/* Privacy toggle */}
+          <div className="flex items-center justify-between rounded-xl border border-white/5 bg-gradient-to-r from-surface-elevated/80 to-surface/30 p-5 transition-all duration-300 hover:border-gold/20">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-bold text-text-heading">
+                {usePublicSwap ? "Public Engine" : "Zero-Knowledge Engine"}
+              </span>
+              <span className="text-xs text-text-caption font-medium">
+                {usePublicSwap ? "Visible on Sepolia" : "100% Cryptographic Privacy"}
+              </span>
+            </div>
+            <button
+              onClick={() => setUsePublicSwap(!usePublicSwap)}
+              className="px-5 py-2.5 rounded-lg text-xs font-bold tracking-widest uppercase transition-all bg-surface-elevated border border-white/10 hover:border-gold/40 hover:text-gold hover:shadow-[0_0_15px_rgba(201,169,78,0.15)]"
+            >
+              {usePublicSwap ? "Shield" : "Unshield"}
+            </button>
+          </div>
+
+          {!usePublicSwap && parsedAmountIn > 0n && !selectedNote && (
+            <div className="p-4 rounded-xl bg-signal-error/10 border border-signal-error/20">
+              <p className="text-sm text-signal-error font-medium text-center">
+                No shielded note with sufficient balance. Shield tokens first on the Shield page.
+              </p>
+            </div>
+          )}
+
+          {poolOps.error && (
+            <div className="p-4 rounded-xl bg-signal-error/10 border border-signal-error/20">
+              <p className="text-sm text-signal-error font-medium text-center">{poolOps.error}</p>
+            </div>
+          )}
+
+          <div>
+            <Button
+              variant="primary"
+              className="w-full h-16 text-lg font-bold tracking-widest uppercase shadow-lg shadow-gold/20"
+              disabled={usePublicSwap ? !canSwapPublic : !canSwapPrivate}
+              onClick={() => setShowConfirm(true)}
+            >
+              {usePublicSwap ? "Execute Swap" : "Execute Shielded Swap"}
+            </Button>
+          </div>
+        </div>
       </Card>
 
       <SwapConfirmModal
@@ -299,24 +315,26 @@ export function SwapCard() {
       <ProofProgress open={swap.isPending} label="Shielded Swap" />
 
       {recentSwaps.length > 0 && (
-        <Card className="space-y-3">
-          <h3 className="text-sm font-medium text-text-heading">Recent Swaps</h3>
-          <div className="space-y-2">
+        <Card animated className="space-y-4 bg-surface/40 backdrop-blur-xl border-white/5 mt-8">
+          <h3 className="text-sm font-semibold tracking-widest uppercase text-text-caption">Recent Transactions</h3>
+          <div className="space-y-3">
             {recentSwaps.map((tx) => (
               <div
                 key={tx.txHash}
-                className="flex items-center justify-between p-3 rounded-lg border border-border bg-surface-elevated"
+                className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-white/5 bg-gradient-to-br from-surface-elevated/80 to-surface/30 transition-all duration-300 hover:border-gold/30"
               >
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-text-body font-medium">
-                      {tx.amountIn} {tx.tokenIn} → {tx.tokenOut}
+                  <div className="flex items-center gap-3">
+                    <p className="text-base text-text-display font-bold tracking-tight">
+                      {tx.amountIn} <span className="text-text-caption font-medium mx-1">{tx.tokenIn}</span> → <span className="text-text-caption font-medium mx-1">{tx.tokenOut}</span>
                     </p>
                     {tx.isPrivate && (
-                      <span className="text-xs text-gold">Shielded</span>
+                      <span className="px-2 py-0.5 rounded-full bg-gold/10 border border-gold/20 text-[10px] uppercase tracking-widest text-gold font-bold">
+                        Shielded
+                      </span>
                     )}
                   </div>
-                  <p className="text-xs text-text-caption mt-0.5">
+                  <p className="text-xs text-text-disabled mt-1">
                     {new Date(tx.timestamp).toLocaleString()}
                   </p>
                 </div>
@@ -324,10 +342,10 @@ export function SwapCard() {
                   href={`https://sepolia.voyager.online/tx/${tx.txHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-gold hover:underline flex items-center gap-1"
+                  className="mt-3 sm:mt-0 text-xs font-semibold tracking-widest uppercase text-gold hover:text-white transition-colors flex items-center gap-1.5"
                 >
-                  View on Voyager
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  Voyager
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
                 </a>
