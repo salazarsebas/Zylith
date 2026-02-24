@@ -43,6 +43,7 @@
 
   /* Animation */
   --animate-progress-indeterminate: progress-indeterminate 1.5s ease-in-out infinite;
+  --animate-border-spin: border-spin 2.5s linear infinite;
 }
 
 /* Base styles */
@@ -116,4 +117,9 @@
   0% { transform: translateX(-100%); }
   50% { transform: translateX(200%); }
   100% { transform: translateX(-100%); }
+}
+
+@keyframes border-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
 }

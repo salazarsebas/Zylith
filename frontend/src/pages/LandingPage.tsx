@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { motion } from "motion/react";
 import { InteractiveBackground } from "@/components/ui/InteractiveBackground";
 import { GlowingCard } from "@/components/ui/GlowingCard";
+import { SnakeButton } from "@/components/ui/SnakeButton";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -74,21 +75,14 @@ export function LandingPage() {
             privacy. Swap, provide liquidity, and earn fees — entirely shielded.
           </motion.p>
 
-          <motion.div variants={itemVariants} className="mt-14 flex items-center justify-center gap-5">
-            <Link
-              to="/app"
-              className="inline-flex items-center justify-center rounded-xl bg-gold px-8 py-4 text-base font-semibold text-canvas transition-all hover:bg-gold-muted active:scale-95 shadow-[0_0_30px_rgba(201,169,78,0.2)] hover:shadow-[0_0_40px_rgba(201,169,78,0.4)] min-w-[200px]"
-            >
+          <motion.div variants={itemVariants} className="mt-14 flex flex-wrap items-center justify-center gap-5">
+            <SnakeButton to="/app" primary className="min-w-[200px]">
               Start Trading
-            </Link>
-            <a
-              href="https://github.com/zylith-protocol"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center rounded-xl border border-border bg-surface/30 backdrop-blur-sm px-8 py-4 text-base font-medium text-text-body transition-all hover:bg-surface-elevated hover:text-text-display hover:border-text-caption min-w-[200px]"
-            >
+            </SnakeButton>
+
+            <SnakeButton href="https://github.com/zylith-protocol" className="min-w-[200px]">
               View GitHub
-            </a>
+            </SnakeButton>
           </motion.div>
         </motion.section>
 
