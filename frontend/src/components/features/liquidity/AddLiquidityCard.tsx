@@ -3,7 +3,6 @@ import { Card } from "@/components/ui/Card";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { ShieldIcon } from "@/components/ui/ShieldIcon";
 import { ProofProgress } from "@/components/features/shared/ProofProgress";
 import { useMint } from "@/hooks/useMint";
 import { useSdkStore } from "@/stores/sdkStore";
@@ -90,7 +89,7 @@ export function AddLiquidityCard() {
     <>
       <Card className="space-y-5">
         <div className="flex items-center gap-2">
-          <ShieldIcon size={18} className="text-gold" />
+          
           <h2 className="text-base font-medium text-text-heading">
             Add Shielded Liquidity
           </h2>

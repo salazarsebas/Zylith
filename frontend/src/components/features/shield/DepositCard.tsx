@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { Button } from "@/components/ui/Button";
-import { ShieldIcon } from "@/components/ui/ShieldIcon";
 import { TokenSelector } from "@/components/features/shared/TokenSelector";
 import { ProofProgress } from "@/components/features/shared/ProofProgress";
 import { useDeposit } from "@/hooks/useDeposit";
@@ -73,7 +72,7 @@ export function DepositCard() {
     <div className="space-y-4">
       <Card className="space-y-5">
         <div className="flex items-center gap-2">
-          <ShieldIcon size={18} className="text-gold" />
+          
           <h2 className="text-base font-medium text-text-heading">Shield Your Tokens</h2>
         </div>
 

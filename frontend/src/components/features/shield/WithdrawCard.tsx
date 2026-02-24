@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { ShieldIcon } from "@/components/ui/ShieldIcon";
 import { TokenIcon } from "@/components/ui/TokenIcon";
 import { ProofProgress } from "@/components/features/shared/ProofProgress";
 import { useWithdraw } from "@/hooks/useWithdraw";
@@ -34,7 +33,7 @@ export function WithdrawCard() {
     <>
       <Card className="space-y-5">
         <div className="flex items-center gap-2">
-          <ShieldIcon size={18} />
+          
           <h2 className="text-base font-medium text-text-heading">Unshield Tokens</h2>
         </div>
         <p className="text-sm text-text-caption">

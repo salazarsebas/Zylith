@@ -2,7 +2,6 @@ import { useSdkStore } from "@/stores/sdkStore";
 import { TESTNET_TOKENS } from "@/config/tokens";
 import { formatTokenAmount } from "@/lib/format";
 import { Card } from "@/components/ui/Card";
-import { ShieldIcon } from "@/components/ui/ShieldIcon";
 
 export function BalanceDisplay() {
   const isInitialized = useSdkStore((s) => s.isInitialized);
@@ -25,7 +24,7 @@ export function BalanceDisplay() {
   return (
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-3">
-        <ShieldIcon size={16} className="text-gold" />
+        
         <h3 className="text-sm font-medium text-text-heading">Shielded Balances</h3>
       </div>
 

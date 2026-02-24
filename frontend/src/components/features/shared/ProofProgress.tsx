@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { ShieldIcon } from "@/components/ui/ShieldIcon";
 
 interface ProofProgressProps {
   open: boolean;
@@ -38,7 +37,7 @@ export function ProofProgress({ open, label = "Shielded Transaction" }: ProofPro
           <Spinner size="lg" />
         </div>
         <div className="mb-2 flex items-center justify-center gap-2">
-          <ShieldIcon size={14} className="text-gold" />
+          
           <h3 className="text-sm font-semibold text-text-display">{label}</h3>
         </div>
         <p className="mb-4 text-sm text-text-caption">{stage}</p>

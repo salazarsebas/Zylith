@@ -1,7 +1,6 @@
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { ShieldIcon } from "@/components/ui/ShieldIcon";
 import { TokenIcon } from "@/components/ui/TokenIcon";
 import { useSdkStore } from "@/stores/sdkStore";
 import { getTokenSymbol, TESTNET_TOKENS } from "@/config/tokens";
@@ -26,7 +25,7 @@ export function Dashboard() {
         {/* Shielded Balance */}
         <Card>
           <div className="flex items-center gap-2 mb-3">
-            <ShieldIcon size={16} className="text-gold" />
+            
             <p className="text-sm font-medium text-text-caption">Shielded Balance</p>
           </div>
           {!isInitialized ? (

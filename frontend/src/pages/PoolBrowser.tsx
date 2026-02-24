@@ -4,7 +4,6 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { ShieldIcon } from "@/components/ui/ShieldIcon";
 import { usePoolState } from "@/hooks/usePoolState";
 import { TESTNET_TOKENS, type Token } from "@/config/tokens";
 import { FEE_TIERS } from "@zylith/sdk";

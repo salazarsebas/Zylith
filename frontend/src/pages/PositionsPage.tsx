@@ -4,7 +4,6 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
-import { ShieldIcon } from "@/components/ui/ShieldIcon";
 import { ProofProgress } from "@/components/features/shared/ProofProgress";
 import { useBurn } from "@/hooks/useBurn";
 import { useSdkStore } from "@/stores/sdkStore";
@@ -154,7 +153,7 @@ export function PositionsPage() {
             <Card key={pos.commitment}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <ShieldIcon size={14} className="text-gold" />
+                  
                   <span className="text-sm font-medium text-text-heading">
                     Shielded Position
                   </span>
