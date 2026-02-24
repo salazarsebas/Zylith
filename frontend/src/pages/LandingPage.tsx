@@ -9,20 +9,39 @@ const containerVariants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.1,
+      staggerChildren: 0.15,
+      delayChildren: 0.2,
     },
   },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 30, filter: "blur(8px)" },
   visible: {
     opacity: 1,
     y: 0,
+    filter: "blur(0px)",
     transition: {
-      duration: 0.5,
-      ease: [0.25, 0.46, 0.45, 0.94],
+      type: "spring",
+      mass: 1,
+      stiffness: 100,
+      damping: 20,
+    },
+  },
+};
+
+const textRevealVariants = {
+  hidden: { opacity: 0, y: 40, filter: "blur(12px)", scale: 0.95 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+    scale: 1,
+    transition: {
+      type: "spring",
+      mass: 1.2,
+      stiffness: 80,
+      damping: 20,
     },
   },
 };
@@ -62,7 +81,7 @@ export function LandingPage() {
         >
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[60%] bg-gold/5 blur-[120px] rounded-full point-events-none" />
 
-          <motion.h1 variants={itemVariants} className="text-7xl md:text-8xl font-bold tracking-tighter leading-[1.05]">
+          <motion.h1 variants={textRevealVariants} className="text-7xl md:text-8xl font-bold tracking-tighter leading-[1.05]">
             <span className="text-text-display">Shielded Liquidity</span>
             <br />
             <span className="bg-gradient-to-r from-gold via-gold-muted to-gold-dim bg-clip-text text-transparent">
@@ -70,7 +89,7 @@ export function LandingPage() {
             </span>
           </motion.h1>
 
-          <motion.p variants={itemVariants} className="mx-auto mt-10 max-w-2xl text-xl text-text-body leading-relaxed font-light">
+          <motion.p variants={textRevealVariants} className="mx-auto mt-10 max-w-2xl text-xl text-text-body leading-relaxed font-light">
             The concentrated liquidity market maker with zero-knowledge
             privacy. Swap, provide liquidity, and earn fees — entirely shielded.
           </motion.p>
