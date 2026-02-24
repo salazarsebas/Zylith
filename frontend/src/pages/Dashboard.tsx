@@ -23,9 +23,9 @@ export function Dashboard() {
 
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         {/* Shielded Balance */}
-        <Card>
+        <Card animated>
           <div className="flex items-center gap-2 mb-3">
-            
+
             <p className="text-sm font-medium text-text-caption">Shielded Balance</p>
           </div>
           {!isInitialized ? (
@@ -59,7 +59,7 @@ export function Dashboard() {
         </Card>
 
         {/* Positions */}
-        <Card>
+        <Card animated>
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-text-caption">Shielded Positions</p>
             <Badge variant={unspentPositions.length > 0 ? "gold" : "default"}>
