@@ -10,6 +10,23 @@ export function InteractiveBackground() {
     const smoothX = useSpring(mouseX, { damping: 50, stiffness: 400 });
     const smoothY = useSpring(mouseY, { damping: 50, stiffness: 400 });
 
+    // Move hooks to the top level to avoid conditional hook calls
+    const bgGlow = useMotionTemplate`
+    radial-gradient(
+      600px circle at ${smoothX}px ${smoothY}px,
+      rgba(201, 169, 78, 0.08),
+      transparent 80%
+    )
+  `;
+
+    const maskGlow = useMotionTemplate`
+    radial-gradient(
+      250px circle at ${smoothX}px ${smoothY}px,
+      black,
+      transparent 80%
+    )
+  `;
+
     useEffect(() => {
         setIsMounted(true);
         function handleMouseMove({ clientX, clientY }: MouseEvent) {
@@ -58,48 +75,24 @@ export function InteractiveBackground() {
             />
 
             {/* 3. Interactive Ambient Glow */}
-            {isMounted && (
-                <motion.div
-                    className="absolute inset-0 z-10 transition-opacity duration-300"
-                    style={{
-                        background: useMotionTemplate`
-              radial-gradient(
-                600px circle at ${smoothX}px ${smoothY}px,
-                rgba(201, 169, 78, 0.08),
-                transparent 80%
-              )
-            `,
-                    }}
-                />
-            )}
+            <motion.div
+                className={`absolute inset-0 z-10 transition-opacity duration-300 ${isMounted ? 'opacity-100' : 'opacity-0'}`}
+                style={{ background: bgGlow }}
+            />
 
             {/* 4. Interactive Spotlight Grid Mask (Reveals a glowing grid on hover) */}
-            {isMounted && (
-                <motion.div
-                    className="absolute inset-0 z-10"
-                    style={{
-                        backgroundImage: `
-              linear-gradient(to right, rgba(201, 169, 78, 0.4) 1px, transparent 1px),
-              linear-gradient(to bottom, rgba(201, 169, 78, 0.4) 1px, transparent 1px)
-            `,
-                        backgroundSize: '40px 40px',
-                        WebkitMaskImage: useMotionTemplate`
-              radial-gradient(
-                250px circle at ${smoothX}px ${smoothY}px,
-                black,
-                transparent 80%
-              )
-            `,
-                        maskImage: useMotionTemplate`
-              radial-gradient(
-                250px circle at ${smoothX}px ${smoothY}px,
-                black,
-                transparent 80%
-              )
-            `,
-                    }}
-                />
-            )}
+            <motion.div
+                className={`absolute inset-0 z-10 transition-opacity duration-300 ${isMounted ? 'opacity-100' : 'opacity-0'}`}
+                style={{
+                    backgroundImage: `
+            linear-gradient(to right, rgba(201, 169, 78, 0.4) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(201, 169, 78, 0.4) 1px, transparent 1px)
+          `,
+                    backgroundSize: '40px 40px',
+                    WebkitMaskImage: maskGlow,
+                    maskImage: maskGlow,
+                }}
+            />
 
             {/* Vignette overlay for depth */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,var(--color-canvas)_100%)] opacity-80" />
