@@ -18,13 +18,7 @@ fn nullifier_spent_selector() -> Felt {
     starknet::core::utils::get_selector_from_name("NullifierSpent").unwrap()
 }
 
-fn mint_verified_selector() -> Felt {
-    starknet::core::utils::get_selector_from_name("MintVerified").unwrap()
-}
 
-fn burn_verified_selector() -> Felt {
-    starknet::core::utils::get_selector_from_name("BurnVerified").unwrap()
-}
 
 /// Reconstruct a u256 from two consecutive felt252 values (low, high) as decimal string.
 fn felts_to_decimal(low: &Felt, high: &Felt) -> String {
@@ -55,19 +49,7 @@ struct NullifierSpentEvent {
     nullifier_hash_decimal: String,
 }
 
-/// Parsed MintVerified event (contains change commitments).
-#[derive(Debug)]
-struct MintVerifiedEvent {
-    change_commitment_0: String,
-    change_commitment_1: String,
-}
 
-/// Parsed BurnVerified event (contains output commitments).
-#[derive(Debug)]
-struct BurnVerifiedEvent {
-    new_commitment_0: String,
-    new_commitment_1: String,
-}
 
 /// Parse a CommitmentAdded event from raw data.
 /// Data layout: [commitment_low, commitment_high, leaf_index, new_root_low, new_root_high]

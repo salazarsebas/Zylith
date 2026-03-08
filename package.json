@@ -2,9 +2,16 @@
   "name": "zylith",
   "version": "0.1.0",
   "description": "Shielded CLMM for Bitcoin on Starknet",
-  "workspaces": ["sdk", "frontend"],
+  "workspaces": ["frontend"],
   "scripts": {
+    "dev": "bun run dev:frontend",
+    "dev:frontend": "cd frontend && bun run dev",
+    "dev:asp": "cd asp && cargo run",
+    "dev:all": "bun run dev:frontend & bun run dev:asp",
     "build": "bun run build:cairo && bun run build:circuits",
+    "build:frontend": "cd frontend && bun run build",
+    "build:asp": "cd asp && cargo build --release",
+    "build:sdk": "cd sdk && bun run build",
     "build:cairo": "scarb build",
     "build:circuits": "cd circuits && mkdir -p build && bun run compile:all",
     "build:circuits:membership": "cd circuits && bun run compile:membership",
@@ -12,13 +19,16 @@
     "build:circuits:liquidity": "cd circuits && bun run compile:liquidity",
     "test": "bun run test:cairo",
     "test:cairo": "scarb test",
+    "test:sdk": "cd sdk && bun test",
+    "typecheck": "cd frontend && bun run typecheck",
     "prove": "cd circuits && bun run prove:all",
     "prove:no-garaga": "cd circuits && bun run prove:no-garaga",
     "verify": "cd circuits && bun run verify",
     "clean": "bun run clean:cairo && bun run clean:circuits",
     "clean:cairo": "rm -rf target",
     "clean:circuits": "rm -rf circuits/build",
-    "install:circuits": "cd circuits && bun install"
+    "install:circuits": "cd circuits && bun install",
+    "env:generate": "bash scripts/gen-env.sh"
   },
   "keywords": [
     "starknet",
@@ -30,5 +40,10 @@
     "clmm"
   ],
   "author": "Zylith Protocol",
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "rollup": "^4.59.0",
+    "minimatch": "^5.1.7",
+    "bn.js": "^5.2.3"
+  }
 }

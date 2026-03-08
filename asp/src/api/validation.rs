@@ -78,7 +78,7 @@ pub fn validate_address(value: &str, field_name: &str) -> Result<(), AspError> {
 
 /// Validate a tick value is within the valid CLMM range.
 pub fn validate_tick(tick: i32, field_name: &str) -> Result<(), AspError> {
-    if tick < -MAX_TICK || tick > MAX_TICK {
+    if !(-MAX_TICK..=MAX_TICK).contains(&tick) {
         return Err(AspError::InvalidInput(format!(
             "{field_name} must be between {} and {}",
             -MAX_TICK, MAX_TICK

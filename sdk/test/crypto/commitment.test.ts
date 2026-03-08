@@ -86,12 +86,13 @@ describe("commitment", () => {
       const tickUpper = 60;
       const liquidity = "10000";
 
+      const TICK_OFFSET = 887272;
       const expectedNullifierHash = hash([nullifier]);
       const expectedCommitment = hash([
         secret,
         nullifier,
-        tickLower,
-        tickUpper,
+        tickLower + TICK_OFFSET,
+        tickUpper + TICK_OFFSET,
         liquidity,
       ]);
 

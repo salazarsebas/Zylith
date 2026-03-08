@@ -196,15 +196,14 @@ pub async fn shielded_mint(
 
     // 10. Insert change commitments and position commitment into Merkle tree
     let mut worker = state.worker.lock().await;
-    let mut last_root = String::new();
 
     // Insert change commitment 0 if non-zero
     if !change_commitment_0.is_empty() && change_commitment_0 != "0" {
         let leaf_index = state.db.get_leaf_count()?;
         state
             .db
-            .insert_commitment(leaf_index as u32, &change_commitment_0, Some(&tx_hash))?;
-        last_root = worker.insert_leaf(&change_commitment_0).await?;
+            .insert_commitment(leaf_index, &change_commitment_0, Some(&tx_hash))?;
+        let _ = worker.insert_leaf(&change_commitment_0).await?;
         tracing::debug!(leaf_index = leaf_index, "Inserted change_commitment_0");
     }
 
@@ -213,8 +212,8 @@ pub async fn shielded_mint(
         let leaf_index = state.db.get_leaf_count()?;
         state
             .db
-            .insert_commitment(leaf_index as u32, &change_commitment_1, Some(&tx_hash))?;
-        last_root = worker.insert_leaf(&change_commitment_1).await?;
+            .insert_commitment(leaf_index, &change_commitment_1, Some(&tx_hash))?;
+        let _ = worker.insert_leaf(&change_commitment_1).await?;
         tracing::debug!(leaf_index = leaf_index, "Inserted change_commitment_1");
     }
 
@@ -222,15 +221,15 @@ pub async fn shielded_mint(
     let leaf_index = state.db.get_leaf_count()?;
     state
         .db
-        .insert_commitment(leaf_index as u32, &position_commitment, Some(&tx_hash))?;
-    last_root = worker.insert_leaf(&position_commitment).await?;
+        .insert_commitment(leaf_index, &position_commitment, Some(&tx_hash))?;
+    let last_root = worker.insert_leaf(&position_commitment).await?;
     tracing::debug!(leaf_index = leaf_index, "Inserted position_commitment");
 
     drop(worker);
 
     // 11. Store the final root in DB
     let new_count = state.db.get_leaf_count()?;
-    state.db.insert_root(&last_root, new_count as u32, Some(&tx_hash))?;
+    state.db.insert_root(&last_root, new_count, Some(&tx_hash))?;
 
     // 12. Submit the new Merkle root to Coordinator on-chain
     if let Some(ref relayer) = state.relayer {

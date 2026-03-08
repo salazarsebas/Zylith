@@ -150,7 +150,7 @@ pub async fn shielded_burn(
         let leaf_index = state.db.get_leaf_count()?;
         state
             .db
-            .insert_commitment(leaf_index as u32, &output0.commitment, Some(&tx_hash))?;
+            .insert_commitment(leaf_index, &output0.commitment, Some(&tx_hash))?;
         last_root = worker.insert_leaf(&output0.commitment).await?;
         tracing::debug!(leaf_index = leaf_index, "Inserted output_commitment_0");
     }
@@ -160,7 +160,7 @@ pub async fn shielded_burn(
         let leaf_index = state.db.get_leaf_count()?;
         state
             .db
-            .insert_commitment(leaf_index as u32, &output1.commitment, Some(&tx_hash))?;
+            .insert_commitment(leaf_index, &output1.commitment, Some(&tx_hash))?;
         last_root = worker.insert_leaf(&output1.commitment).await?;
         tracing::debug!(leaf_index = leaf_index, "Inserted output_commitment_1");
     }
@@ -170,7 +170,7 @@ pub async fn shielded_burn(
     // 10. Store the final root in DB (if we inserted anything)
     if !last_root.is_empty() {
         let new_count = state.db.get_leaf_count()?;
-        state.db.insert_root(&last_root, new_count as u32, Some(&tx_hash))?;
+        state.db.insert_root(&last_root, new_count, Some(&tx_hash))?;
 
         // 11. Submit the new Merkle root to Coordinator on-chain
         if let Some(ref relayer) = state.relayer {

@@ -3,8 +3,7 @@ use std::sync::Arc;
 use axum::middleware;
 use axum::routing::{get, post};
 use axum::Router;
-use tower_governor::governor::GovernorConfigBuilder;
-use tower_governor::GovernorLayer;
+
 use tower_http::cors::CorsLayer;
 
 use crate::AppState;

@@ -146,14 +146,13 @@ pub async fn shielded_swap(
 
     // 10. Insert output and change commitments into Merkle tree
     let mut worker = state.worker.lock().await;
-    let mut last_root = String::new();
 
     // Insert output commitment (always present)
     let leaf_index = state.db.get_leaf_count()?;
     state
         .db
-        .insert_commitment(leaf_index as u32, &output_commitment.commitment, Some(&tx_hash))?;
-    last_root = worker.insert_leaf(&output_commitment.commitment).await?;
+        .insert_commitment(leaf_index, &output_commitment.commitment, Some(&tx_hash))?;
+    let mut last_root = worker.insert_leaf(&output_commitment.commitment).await?;
     tracing::debug!(leaf_index = leaf_index, "Inserted output_commitment");
 
     // Insert change commitment if non-zero
@@ -161,7 +160,7 @@ pub async fn shielded_swap(
         let leaf_index = state.db.get_leaf_count()?;
         state
             .db
-            .insert_commitment(leaf_index as u32, &change_commitment, Some(&tx_hash))?;
+            .insert_commitment(leaf_index, &change_commitment, Some(&tx_hash))?;
         last_root = worker.insert_leaf(&change_commitment).await?;
         tracing::debug!(leaf_index = leaf_index, "Inserted change_commitment");
     }
@@ -170,7 +169,7 @@ pub async fn shielded_swap(
 
     // 11. Store the final root in DB
     let new_count = state.db.get_leaf_count()?;
-    state.db.insert_root(&last_root, new_count as u32, Some(&tx_hash))?;
+    state.db.insert_root(&last_root, new_count, Some(&tx_hash))?;
 
     // 12. Submit the new Merkle root to Coordinator on-chain
     if let Some(ref relayer) = state.relayer {
