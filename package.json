@@ -8,7 +8,7 @@
     "dev:frontend": "cd frontend && bun run dev",
     "dev:asp": "cd asp && cargo run",
     "dev:all": "bun run dev:frontend & bun run dev:asp",
-    "build": "bun run build:cairo && bun run build:circuits",
+    "build": "bun run build:frontend",
     "build:frontend": "cd frontend && bun run build",
     "build:asp": "cd asp && cargo build --release",
     "build:sdk": "cd sdk && bun run build",
