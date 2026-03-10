@@ -13,7 +13,6 @@ snforge_std = "0.55.0"
 [profile.dev.cairo]
 unstable-add-statements-functions-debug-info = true
 unstable-add-statements-code-locations-debug-info = true
-panic-backtrace = true
 
 [profile.release.cairo]
 # No debug metadata → smaller Sierra files for deployment
@@ -21,3 +20,4 @@ panic-backtrace = true
 [[target.starknet-contract]]
 sierra = true
 casm = true
+allowed-libfuncs-list.name = "experimental"

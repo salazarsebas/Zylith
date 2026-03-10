@@ -31,7 +31,24 @@ struct WorkerResponse {
 
 impl Worker {
     pub async fn spawn(worker_path: &str) -> Result<Self, AspError> {
-        let mut child = tokio::process::Command::new("node")
+        // Use BUN_RUNTIME env var if set, otherwise try "bun" then fall back to "node"
+        let runtime = std::env::var("BUN_RUNTIME").unwrap_or_else(|_| {
+            // Check if bun is available
+            if std::process::Command::new("bun")
+                .arg("--version")
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .is_ok()
+            {
+                "bun".to_string()
+            } else {
+                "node".to_string()
+            }
+        });
+        tracing::info!(runtime = %runtime, "Spawning worker process");
+
+        let mut child = tokio::process::Command::new(&runtime)
             .arg(worker_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())

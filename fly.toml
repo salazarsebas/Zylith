@@ -1,0 +1,35 @@
+# Fly.io configuration for the Zylith ASP (Aggregation Service Provider)
+# Deploy with: fly deploy
+
+app = "zylith-asp"
+primary_region = "dfw"
+
+[build]
+
+[env]
+  ASP_HOST = "0.0.0.0"
+  ASP_PORT = "8080"
+  DATABASE_PATH = "/data/zylith_asp.db"
+  WORKER_PATH = "/app/asp/worker/worker.mjs"
+  SYNC_POLL_INTERVAL_SECS = "10"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 100
+    soft_limit = 80
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[mounts]
+  source = "zylith_data"
+  destination = "/data"

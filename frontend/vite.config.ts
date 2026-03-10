@@ -30,6 +30,9 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    chunkSizeWarningLimit: 4500,
+  },
   server: {
     port: 5173,
     proxy: {

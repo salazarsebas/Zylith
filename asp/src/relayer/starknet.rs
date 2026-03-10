@@ -24,14 +24,8 @@ impl StarknetRelayer {
                 .map_err(|e| AspError::Config(format!("Invalid RPC URL: {e}")))?,
         ));
 
-        // Load keystore
-        let keystore_content = std::fs::read_to_string(&config.keystore_path)
-            .map_err(|e| AspError::Config(format!("Failed to read keystore: {e}")))?;
-        let keystore: serde_json::Value = serde_json::from_str(&keystore_content)
-            .map_err(|e| AspError::Config(format!("Invalid keystore JSON: {e}")))?;
-
-        // Extract private key from keystore (starkli format)
-        let private_key = decrypt_keystore(&keystore, &config.keystore_password)?;
+        // Resolve private key: prefer ADMIN_PRIVATE_KEY env var, fall back to keystore file
+        let private_key = resolve_private_key(config)?;
         let signer = LocalWallet::from(SigningKey::from_secret_scalar(private_key));
 
         let admin_address = Felt::from_hex(&config.admin_address)
@@ -357,19 +351,22 @@ mod tests {
     }
 }
 
-/// Load admin private key from env var or keystore.
-fn decrypt_keystore(
-    _keystore: &serde_json::Value,
-    _password: &str,
-) -> Result<Felt, AspError> {
-    // Try ADMIN_PRIVATE_KEY env var first (simpler for development)
+/// Resolve private key from ADMIN_PRIVATE_KEY env var or keystore file.
+fn resolve_private_key(config: &Config) -> Result<Felt, AspError> {
+    // Prefer ADMIN_PRIVATE_KEY env var (required for containerized deploys)
     if let Ok(pk) = std::env::var("ADMIN_PRIVATE_KEY") {
         tracing::info!("Using admin private key from ADMIN_PRIVATE_KEY env var");
         return Felt::from_hex(&pk)
             .map_err(|e| AspError::Config(format!("Invalid ADMIN_PRIVATE_KEY: {e}")));
     }
 
+    // Fall back to keystore file
+    let keystore_content = std::fs::read_to_string(&config.keystore_path)
+        .map_err(|e| AspError::Config(format!("Failed to read keystore: {e}")))?;
+    let _keystore: serde_json::Value = serde_json::from_str(&keystore_content)
+        .map_err(|e| AspError::Config(format!("Invalid keystore JSON: {e}")))?;
+
     Err(AspError::Config(
-        "ADMIN_PRIVATE_KEY env var is required for relayer mode".into(),
+        "ADMIN_PRIVATE_KEY env var is required (keystore decryption not implemented)".into(),
     ))
 }

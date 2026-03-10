@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: cd frontend && bun run typecheck
+      - run: cd frontend && bun run build
+        env:
+          VITE_STARKNET_RPC_URL: ${{ secrets.VITE_STARKNET_RPC_URL }}
+          VITE_ASP_URL: ${{ secrets.VITE_ASP_URL }}
+          VITE_CHAIN_ID: ${{ secrets.VITE_CHAIN_ID }}
+          VITE_CAVOS_APP_ID: ${{ secrets.VITE_CAVOS_APP_ID }}
+          VITE_STARKNET_NETWORK: ${{ secrets.VITE_STARKNET_NETWORK }}
+
+  sdk:
+    name: SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: cd sdk && bun install
+      - run: cd sdk && bun test
+
+  asp:
+    name: ASP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: oven-sh/setup-bun@v2
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: asp
+      - run: cd circuits && bun install
+      - run: cd asp && cargo clippy -- -D warnings
+      - run: cd asp && cargo test
+
+  cairo:
+    name: Cairo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: software-mansion/setup-scarb@v1
+      - run: scarb build
+      - run: scarb test

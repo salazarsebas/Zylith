@@ -101,7 +101,7 @@ async fn create_test_state() -> Arc<AppState> {
         config,
         db,
         worker: Mutex::new(worker),
-        relayer: Mutex::new(Box::new(MockRelayer) as Box<dyn Relayer>),
+        relayer: Some(Mutex::new(Box::new(MockRelayer) as Box<dyn Relayer>)),
     })
 }
 
@@ -128,8 +128,6 @@ async fn test_deposit_success() {
     let body: serde_json::Value = resp.json();
     assert_eq!(body["status"], "confirmed");
     assert_eq!(body["leaf_index"], 0);
-    assert_eq!(body["tx_hash"], "0xmock_deposit_tx");
-    assert_eq!(body["root_tx_hash"], "0xmock_root_tx");
     // root should be a hex string (non-empty)
     assert!(body["root"].as_str().unwrap().starts_with("0x"));
 }

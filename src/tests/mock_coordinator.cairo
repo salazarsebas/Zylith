@@ -5,9 +5,10 @@ pub mod MockCoordinator {
     use crate::interfaces::coordinator::IVerifierCoordinator;
     use crate::types::TickTrait;
     use crate::verifier::types::{
-        SwapPublicInputs, MintPublicInputs, BurnPublicInputs, TICK_OFFSET,
-        offset_tick_to_signed,
+        MembershipPublicInputs, SwapPublicInputs, MintPublicInputs, BurnPublicInputs,
+        TICK_OFFSET, offset_tick_to_signed,
     };
+    use core::num::traits::Zero;
 
     #[storage]
     struct Storage {
@@ -33,8 +34,15 @@ pub mod MockCoordinator {
     impl MockCoordinatorImpl of IVerifierCoordinator<ContractState> {
         fn verify_membership(
             ref self: ContractState, full_proof_with_hints: Span<felt252>,
-        ) -> bool {
-            true
+        ) -> MembershipPublicInputs {
+            MembershipPublicInputs {
+                root: 0,
+                nullifier_hash: 0,
+                recipient: Zero::zero(),
+                amount_low: 0,
+                amount_high: 0,
+                token: Zero::zero(),
+            }
         }
 
         fn verify_swap(
