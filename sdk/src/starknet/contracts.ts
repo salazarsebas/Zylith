@@ -3,6 +3,7 @@
 export interface ContractAddresses {
   pool: string;
   coordinator: string;
+  relayer: string;
   verifiers: {
     membership: string;
     swap: string;
@@ -13,15 +14,17 @@ export interface ContractAddresses {
 
 /** Starknet Sepolia deployed addresses */
 export const SEPOLIA_ADDRESSES: ContractAddresses = {
-  pool: "0x0499a1be042eefdcc30de5b44d93edba865c1d24d2144a7ccd03af4aa1b02782",
+  pool: "0x070b2753903daa003d01e874bbb2ac1d27461e0a51bb6bc9801fb0937f3c94ed",
   coordinator:
-    "0x01b5599249e90b473548b68a7ada3d48d75c7641a964b2f729595ac550339eea",
+    "0x01b527eca2f65d6d33aafe679a15ced73386376581e94dc493b9acc5d894ec66",
+  relayer:
+    "0x035b91a871b0cbd5e488819a87fd2b0e79c87d757405e73a19354c370a02ed8c",
   verifiers: {
     membership:
       "0x052eea56144dc3b636ff0dc9e0a2e1468bb1e043ef1b2bed438a2a7278f7e87f",
-    swap: "0x02a00a05df3752c65816a61248be60312bce4032c17fd5c711f3c41fc5253f92",
+    swap: "0x049c912cbe6f8534dc2a3ca5e499ff585e4557dfdc2a76e92fae8f6ee93b132b",
     mint: "0x030d423c00212ff44f02628e8304636ad44b9572c4754f4886381d1de87a226e",
-    burn: "0x06b03f20b8348766fb81fc62dd02258ecb3149c143825af49b6f3fd4b8bdf4db",
+    burn: "0x00d4fe6b25433300729f7c3b1e48d0dc591b483da3b9bab9a407c63ebcc8a53a",
   },
 };
 
