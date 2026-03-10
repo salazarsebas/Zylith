@@ -119,6 +119,10 @@ export async function swap(
   const actualChangeAmount = BigInt(response.amount_change);
   if (actualChangeAmount > 0n && response.change_commitment && response.change_commitment !== "0") {
     noteManager.updateNote(changeNullifier, response.change_commitment, actualChangeAmount);
+  } else {
+    // No change needed — mark the placeholder as spent so it doesn't appear as an unspent note
+    const changeNote = noteManager.getAllNotes().find((n) => n.nullifier === changeNullifier);
+    if (changeNote) noteManager.markSpent(changeNote.nullifierHash);
   }
 
   // Immediately sync leaf indexes so the new notes are withdrawable right away

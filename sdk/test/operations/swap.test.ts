@@ -25,7 +25,10 @@ describe("swap operation", () => {
         tx_hash: "0xswap",
         new_commitment: "0xnew",
         change_commitment: "0xchange",
+        amount_out: "550",
+        amount_change: "400",
       }),
+      syncCommitments: vi.fn().mockResolvedValue({}),
     } as unknown as AspClient;
 
     const result = await swap(
@@ -71,8 +74,11 @@ describe("swap operation", () => {
         status: "ok",
         tx_hash: "0xswap",
         new_commitment: "0xnew",
-        change_commitment: "0xchange",
+        change_commitment: "0",
+        amount_out: "450",
+        amount_change: "0",
       }),
+      syncCommitments: vi.fn().mockResolvedValue({}),
     } as unknown as AspClient;
 
     await swap(

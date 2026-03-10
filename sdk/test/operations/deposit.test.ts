@@ -16,9 +16,8 @@ describe("deposit operation", () => {
       deposit: vi.fn().mockResolvedValue({
         status: "ok",
         leaf_index: 3,
-        tx_hash: "0xabc",
+        calldata: ["0x1", "0x2"],
         root: "0xroot",
-        root_tx_hash: "0xroot_tx",
       }),
     } as unknown as AspClient;
 
@@ -39,11 +38,10 @@ describe("deposit operation", () => {
     expect(callArg.commitment).toMatch(/^0x/);
 
     // Verify result
-    expect(result.txHash).toBe("0xabc");
     expect(result.leafIndex).toBe(3);
     expect(result.commitment).toBeTruthy();
     expect(result.root).toBe("0xroot");
-    expect(result.rootTxHash).toBe("0xroot_tx");
+    expect(result.calldata).toEqual(["0x1", "0x2"]);
 
     // Verify note was stored
     const notes = noteManager.getAllNotes();
