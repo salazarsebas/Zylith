@@ -67,11 +67,14 @@ export class ZylithClient {
     if (!isInitialized()) await initPoseidon();
     this.noteManager = await NoteManager.load(this.config.password);
 
-    // Auto-sync leaf indexes for notes that are missing one
+    // Auto-sync leaf indexes for notes that are missing one.
+    // Exclude placeholder notes (commitment starts with "pending_") — they were
+    // saved pre-swap and will be updated by swap.ts once the ASP responds.
     if (this.asp) {
+      const isPending = (c: string) => c.startsWith("pending_");
       const missing = [
-        ...this.noteManager.getAllNotes().filter((n) => !n.spent && n.leafIndex === undefined),
-        ...this.noteManager.getAllPositions().filter((p) => !p.spent && p.leafIndex === undefined),
+        ...this.noteManager.getAllNotes().filter((n) => !n.spent && n.leafIndex === undefined && !isPending(n.commitment)),
+        ...this.noteManager.getAllPositions().filter((p) => !p.spent && p.leafIndex === undefined && !isPending(p.commitment)),
       ];
       if (missing.length > 0) {
         try {

@@ -33,12 +33,12 @@ export function usePositionFees(position: PositionNote | null) {
     };
   })();
 
-  // Use coordinator address as the on-chain owner of all shielded positions
-  const coordinatorAddress = SEPOLIA_ADDRESSES.coordinator;
+  // The on-chain owner of shielded positions is the ASP relayer (get_caller_address() in shielded_mint)
+  const ownerAddress = SEPOLIA_ADDRESSES.relayer;
 
   return useQuery({
     queryKey: position && poolKey
-      ? queryKeys.position(poolKey, coordinatorAddress, position.tickLower, position.tickUpper)
+      ? queryKeys.position(poolKey, ownerAddress, position.tickLower, position.tickUpper)
       : ["position", "none"],
     queryFn: async () => {
       if (!client || !poolKey || !position) {
@@ -47,7 +47,7 @@ export function usePositionFees(position: PositionNote | null) {
 
       const positionData = await client.getPosition(
         poolKey,
-        coordinatorAddress,
+        ownerAddress,
         position.tickLower,
         position.tickUpper
       );

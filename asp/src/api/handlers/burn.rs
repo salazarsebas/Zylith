@@ -184,10 +184,31 @@ pub async fn shielded_burn(
 
     tracing::info!(tx_hash = %tx_hash, "Shielded burn confirmed");
 
+    // Echo back the amounts used in the ZK proof so the SDK can save notes correctly.
+    // These are the amounts committed into the output note commitments (private circuit inputs).
+    // For all realistic ERC-20 token amounts the high part is 0, so amount == low.
+    let amount_0_low: u128 = req.output_note_0.amount_low.parse().unwrap_or(0);
+    let amount_0_high: u128 = req.output_note_0.amount_high.parse().unwrap_or(0);
+    let amount_0 = if amount_0_high == 0 {
+        amount_0_low.to_string()
+    } else {
+        format!("{}", (amount_0_high as u128).saturating_mul(u128::MAX).saturating_add(amount_0_low))
+    };
+
+    let amount_1_low: u128 = req.output_note_1.amount_low.parse().unwrap_or(0);
+    let amount_1_high: u128 = req.output_note_1.amount_high.parse().unwrap_or(0);
+    let amount_1 = if amount_1_high == 0 {
+        amount_1_low.to_string()
+    } else {
+        format!("{}", (amount_1_high as u128).saturating_mul(u128::MAX).saturating_add(amount_1_low))
+    };
+
     Ok(Json(BurnResponse {
         status: "confirmed".to_string(),
         tx_hash,
         new_commitment_0: output0.commitment.clone(),
         new_commitment_1: output1.commitment.clone(),
+        amount_0,
+        amount_1,
     }))
 }

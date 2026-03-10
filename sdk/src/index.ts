@@ -39,7 +39,7 @@ export {
   generateRandomSecret,
 } from "./utils/conversions.js";
 
-export { getAmountsForBurn } from "./utils/clmm.js";
+export { getAmountsForBurn, estimateSwapOutput, estimateSwapOutputSafe } from "./utils/clmm.js";
 
 export {
   validateTick,

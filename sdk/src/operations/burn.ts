@@ -18,6 +18,8 @@ export interface BurnResult {
   txHash: string;
   newCommitment0: string;
   newCommitment1: string;
+  amount0: bigint;
+  amount1: bigint;
 }
 
 export async function burn(
@@ -40,6 +42,27 @@ export async function burn(
 
   const { low: out0Low, high: out0High } = u256Split(params.amount0Out);
   const { low: out1Low, high: out1High } = u256Split(params.amount1Out);
+
+  // Save placeholder notes BEFORE calling the ASP so secrets survive even if
+  // the response processing fails. Same pattern as swap.ts.
+  noteManager.addNote({
+    secret: out0Secret,
+    nullifier: out0Nullifier,
+    amount: 0n,
+    token: params.token0,
+    commitment: "pending_burn0_" + out0Nullifier,
+  });
+  noteManager.addNote({
+    secret: out1Secret,
+    nullifier: out1Nullifier,
+    amount: 0n,
+    token: params.token1,
+    commitment: "pending_burn1_" + out1Nullifier,
+  });
+
+  // Mark position spent optimistically
+  noteManager.markSpent(position.nullifierHash);
+  await noteManager.save();
 
   const response = await asp.burn({
     pool_key: {
@@ -73,28 +96,16 @@ export async function burn(
     liquidity: Number(params.liquidity),
   });
 
-  // Update local state
-  noteManager.markSpent(position.nullifierHash);
-
-  if (params.amount0Out > 0n) {
-    noteManager.addNote({
-      secret: out0Secret,
-      nullifier: out0Nullifier,
-      amount: params.amount0Out,
-      token: params.token0,
-      commitment: response.new_commitment_0,
-      txHash: response.tx_hash,
-    });
+  // Update placeholder notes with real commitments and amounts from ASP response.
+  // The ASP echoes back the amounts it used in the ZK proof — these are authoritative.
+  const actual0 = BigInt(response.amount_0);
+  if (actual0 > 0n) {
+    noteManager.updateNote(out0Nullifier, response.new_commitment_0, actual0);
   }
-  if (params.amount1Out > 0n) {
-    noteManager.addNote({
-      secret: out1Secret,
-      nullifier: out1Nullifier,
-      amount: params.amount1Out,
-      token: params.token1,
-      commitment: response.new_commitment_1,
-      txHash: response.tx_hash,
-    });
+
+  const actual1 = BigInt(response.amount_1);
+  if (actual1 > 0n) {
+    noteManager.updateNote(out1Nullifier, response.new_commitment_1, actual1);
   }
 
   // Sync leaf indexes from ASP for output notes
@@ -107,8 +118,8 @@ export async function burn(
     try {
       const syncResponse = await asp.syncCommitments(commitmentsToSync);
       noteManager.updateLeafIndexes(syncResponse);
-    } catch (err) {
-      console.warn("Failed to sync leaf indexes from ASP:", err);
+    } catch {
+      // Non-fatal: leaf indexes will be resolved on next syncNotes()
     }
   }
 
@@ -116,5 +127,7 @@ export async function burn(
     txHash: response.tx_hash,
     newCommitment0: response.new_commitment_0,
     newCommitment1: response.new_commitment_1,
+    amount0: actual0,
+    amount1: actual1,
   };
 }

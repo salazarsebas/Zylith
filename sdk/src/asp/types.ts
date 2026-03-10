@@ -99,6 +99,8 @@ export interface SwapResponse {
   tx_hash: string;
   new_commitment: string;
   change_commitment: string;
+  amount_out: string;    // actual output amount (decimal string)
+  amount_change: string; // actual change amount (decimal string)
 }
 
 // ============================================================================
@@ -165,6 +167,8 @@ export interface BurnResponse {
   tx_hash: string;
   new_commitment_0: string;
   new_commitment_1: string;
+  amount_0: string;   // actual amount for token0 (decimal string)
+  amount_1: string;   // actual amount for token1 (decimal string)
 }
 
 // ============================================================================
