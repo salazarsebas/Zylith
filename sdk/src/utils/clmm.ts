@@ -6,9 +6,6 @@
 // Q128.128 fixed-point ONE = 2^128
 const ONE = 2n ** 128n;
 
-// Tick → sqrt price table (same constants as tick_math.cairo)
-// Using the standard Uniswap V3 approach: sqrt(1.0001^tick) * 2^128
-const LOG_SQRT_10001 = 128242346295617449413693n; // log(sqrt(1.0001)) * 2^128 approximation
 
 function getSqrtPriceAtTick(tick: number): bigint {
   // Port of get_sqrt_price_at_tick from tick_math.cairo
@@ -44,9 +41,8 @@ function getSqrtPriceAtTick(tick: number): bigint {
     ratio = (2n ** 256n - 1n) / ratio;
   }
 
-  // Round up if necessary (shift from Q256 to Q128.128)
-  const result = ratio >> 128n;
-  return result + ((ratio & ((1n << 128n) - 1n)) !== 0n ? 1n : 0n);
+  // ratio is already in Q128.128 format — return it directly
+  return ratio;
 }
 
 /**
@@ -80,6 +76,69 @@ function getAmount1Delta(
     sqrtPriceA < sqrtPriceB ? [sqrtPriceA, sqrtPriceB] : [sqrtPriceB, sqrtPriceA];
 
   return (liquidity * (sqrtUpper - sqrtLower)) / ONE;
+}
+
+/**
+ * Estimate swap output amount using constant-product approximation.
+ * Uses sqrtPrice to compute the effective price and applies the fee.
+ * This is an approximation — actual output may differ slightly due to tick crossings.
+ *
+ * WARNING: This returns a RAW estimate without slippage buffer.
+ * For note commitments, use `estimateSwapOutputSafe()` which applies a conservative
+ * slippage buffer to ensure the committed amount <= actual on-chain output.
+ *
+ * @param sqrtPrice   Current pool sqrt price (Q128.128)
+ * @param amountIn    Exact input amount
+ * @param zeroForOne  true = token0 in, token1 out
+ * @param feePips     Fee in pips (e.g. 3000 = 0.3%)
+ * @returns Estimated output amount
+ */
+export function estimateSwapOutput(
+  sqrtPrice: bigint,
+  amountIn: bigint,
+  zeroForOne: boolean,
+  feePips: number,
+): bigint {
+  if (amountIn === 0n || sqrtPrice === 0n) return 0n;
+
+  const FEE_DENOM = 1_000_000n;
+  const amountInAfterFee = (amountIn * (FEE_DENOM - BigInt(feePips))) / FEE_DENOM;
+
+  if (zeroForOne) {
+    // token0 in → token1 out: amountOut ≈ amountIn * price = amountIn * sqrtPrice^2 / ONE^2
+    return (amountInAfterFee * sqrtPrice * sqrtPrice) / ONE / ONE;
+  } else {
+    // token1 in → token0 out: amountOut ≈ amountIn / price = amountIn * ONE^2 / sqrtPrice^2
+    return (amountInAfterFee * ONE * ONE) / (sqrtPrice * sqrtPrice);
+  }
+}
+
+/**
+ * Estimate swap output with a conservative slippage buffer applied.
+ * The committed amount in the ZK note should be <= actual on-chain output.
+ * If the estimate is too high, the note would have more value than was actually
+ * received — making value unrecoverable. By applying a buffer, we ensure:
+ * - committed amount <= actual output (excess stays in pool, minor loss)
+ * - amountOutMin = committed amount → tx reverts if actual < committed (no loss)
+ *
+ * @param sqrtPrice    Current pool sqrt price (Q128.128)
+ * @param amountIn     Exact input amount
+ * @param zeroForOne   true = token0 in, token1 out
+ * @param feePips      Fee in pips (e.g. 3000 = 0.3%)
+ * @param slippageBps  Slippage buffer in basis points (default 100 = 1%)
+ * @returns Estimated output amount reduced by slippage buffer
+ */
+export function estimateSwapOutputSafe(
+  sqrtPrice: bigint,
+  amountIn: bigint,
+  zeroForOne: boolean,
+  feePips: number,
+  slippageBps: number = 100,
+): bigint {
+  const raw = estimateSwapOutput(sqrtPrice, amountIn, zeroForOne, feePips);
+  if (raw === 0n) return 0n;
+  const slippageDenom = 10_000n;
+  return (raw * (slippageDenom - BigInt(slippageBps))) / slippageDenom;
 }
 
 /**

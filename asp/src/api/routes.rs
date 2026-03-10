@@ -3,7 +3,6 @@ use std::sync::Arc;
 use axum::middleware;
 use axum::routing::{get, post};
 use axum::Router;
-
 use tower_http::cors::CorsLayer;
 
 use crate::AppState;

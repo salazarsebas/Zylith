@@ -18,8 +18,6 @@ fn nullifier_spent_selector() -> Felt {
     starknet::core::utils::get_selector_from_name("NullifierSpent").unwrap()
 }
 
-
-
 /// Reconstruct a u256 from two consecutive felt252 values (low, high) as decimal string.
 fn felts_to_decimal(low: &Felt, high: &Felt) -> String {
     let low_bytes = low.to_bytes_be();
@@ -48,8 +46,6 @@ struct CommitmentAddedEvent {
 struct NullifierSpentEvent {
     nullifier_hash_decimal: String,
 }
-
-
 
 /// Parse a CommitmentAdded event from raw data.
 /// Data layout: [commitment_low, commitment_high, leaf_index, new_root_low, new_root_high]

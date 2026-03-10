@@ -65,6 +65,8 @@ pub struct SwapResponse {
     pub tx_hash: String,
     pub new_commitment: String,
     pub change_commitment: String,
+    pub amount_out: String,   // actual output amount (decimal string)
+    pub amount_change: String, // actual change amount (decimal string)
 }
 
 // --- Mint ---
@@ -143,6 +145,8 @@ pub struct BurnResponse {
     pub tx_hash: String,
     pub new_commitment_0: String,
     pub new_commitment_1: String,
+    pub amount_0: String,   // actual amount for token0 (decimal string)
+    pub amount_1: String,   // actual amount for token1 (decimal string)
 }
 
 // --- Shared types ---

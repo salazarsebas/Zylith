@@ -23,6 +23,7 @@ interface SdkState {
   autoInitialize: () => Promise<boolean>;
   initialize: (password: string) => Promise<void>;
   refreshBalances: () => void;
+  syncNotes: () => Promise<void>;
   lock: () => void;
   resetVault: () => void;
 }
@@ -86,12 +87,71 @@ export const useSdkStore = create<SdkState>((set, get) => ({
     }
   },
 
+  syncNotes: async () => {
+    const { client } = get();
+    if (!client) return;
+    const aspClient = client.getAspClient();
+    if (!aspClient) return;
+    const noteManager = client.getNoteManager();
+
+    try {
+      // 1. Sync leaf indexes for notes missing them.
+      // Skip "pending_" placeholder notes — they don't exist on-chain yet and
+      // will be updated by swap.ts once the ASP responds.
+      const isPending = (commitment: string) => commitment.startsWith("pending_");
+      const missing = [
+        ...noteManager.getAllNotes().filter((n) => !n.spent && n.leafIndex === undefined && !isPending(n.commitment)),
+        ...noteManager.getAllPositions().filter((p) => !p.spent && p.leafIndex === undefined && !isPending(p.commitment)),
+      ];
+      if (missing.length > 0) {
+        const syncData = await aspClient.syncCommitments(missing.map((n) => n.commitment));
+        noteManager.updateLeafIndexes(syncData);
+      }
+
+      // 1b. Clean up stale placeholder notes: if their nullifier hash appears spent
+      // on-chain, it means the swap executed but the SDK crashed before updating
+      // the commitment. Mark them spent so they don't block the UI.
+      const pendingNotes = noteManager.getAllNotes().filter((n) => !n.spent && isPending(n.commitment));
+      for (const note of pendingNotes) {
+        try {
+          const result = await aspClient.getNullifier(note.nullifierHash);
+          if (result.spent) {
+            noteManager.markSpent(note.nullifierHash);
+          }
+        } catch {
+          // Non-fatal
+        }
+      }
+
+      // 2. Check if any unspent notes have nullifiers already spent on-chain.
+      // Skip pending placeholder notes — they have no real nullifierHash yet.
+      const unspentNotes = noteManager.getAllNotes().filter((n) => !n.spent && !isPending(n.commitment));
+      for (const note of unspentNotes) {
+        try {
+          const result = await aspClient.getNullifier(note.nullifierHash);
+          if (result.spent) {
+            noteManager.markSpent(note.nullifierHash);
+          }
+        } catch {
+          // Non-fatal per note
+        }
+      }
+
+      await client.saveNotes();
+      get().refreshBalances();
+    } catch {
+      // Non-fatal
+    }
+  },
+
   refreshBalances: () => {
     const { client } = get();
     if (!client) return;
 
     const noteManager = client.getNoteManager();
-    const notes = noteManager.getUnspentNotes();
+    // Exclude placeholder notes from balance display — they are saved pre-swap
+    // and will be updated with real amounts once the ASP responds.
+    const notes = noteManager.getUnspentNotes().filter((n) => !n.commitment.startsWith("pending_"));
     const positions = noteManager.getUnspentPositions();
 
     // Compute balances per token

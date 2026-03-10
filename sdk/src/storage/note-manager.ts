@@ -110,6 +110,19 @@ export class NoteManager {
     return position;
   }
 
+  /**
+   * Update a note's commitment and amount after ASP confirms the actual values.
+   * Used by swap to update placeholder notes saved before the ASP call.
+   * Matched by nullifier (which is stable across the call).
+   */
+  updateNote(nullifier: string, commitment: string, amount: bigint): void {
+    const note = this.db.notes.find((n) => n.nullifier === nullifier);
+    if (note) {
+      note.commitment = commitment;
+      note.amount = amount.toString();
+    }
+  }
+
   /** Update a note's leaf index after on-chain deposit */
   setLeafIndex(commitment: string, leafIndex: number): void {
     const note = this.db.notes.find((n) => n.commitment === commitment);
