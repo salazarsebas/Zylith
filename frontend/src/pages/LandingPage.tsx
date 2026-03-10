@@ -99,7 +99,7 @@ export function LandingPage() {
               Start Trading
             </SnakeButton>
 
-            <SnakeButton href="https://github.com/zylith-protocol" className="min-w-[200px]">
+            <SnakeButton href="https://github.com/salazarsebas/Zylith" className="min-w-[200px]">
               View GitHub
             </SnakeButton>
           </motion.div>

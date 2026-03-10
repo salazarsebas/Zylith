@@ -1,0 +1,42 @@
+# Rust build artifacts
+asp/target/
+cairo/target/
+
+# Git
+.git/
+.gitignore
+
+# Environment files (secrets set via fly secrets)
+.env*
+asp/.env*
+frontend/.env*
+
+# Frontend (not needed for ASP)
+frontend/node_modules/
+frontend/dist/
+
+# Cairo (smart contracts already deployed)
+cairo/
+
+# SDK
+sdk/
+
+# Node modules (reinstalled in Docker)
+circuits/node_modules/
+asp/worker/node_modules/
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CI/CD
+.github/
+
+# Misc
+*.md
+*.log
