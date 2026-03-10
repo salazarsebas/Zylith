@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { TokenIcon } from "@/components/ui/TokenIcon";
 import { ProofProgress } from "@/components/features/shared/ProofProgress";
 import { PositionFeesCard } from "@/components/features/liquidity/PositionFeesCard";
 import { PriceRangeChart } from "@/components/features/charts/PriceRangeChart";
@@ -11,7 +12,8 @@ import { useBurn } from "@/hooks/useBurn";
 import { usePoolState } from "@/hooks/usePoolState";
 import { useSdkStore } from "@/stores/sdkStore";
 import { useToast } from "@/components/ui/Toast";
-import { TESTNET_TOKENS } from "@/config/tokens";
+import { TESTNET_TOKENS, getTokenSymbol } from "@/config/tokens";
+import { formatTokenAmount } from "@/lib/format";
 import { getPositionStatusText, getPositionStatusVariant } from "@/lib/positionStatus";
 import { FEE_TIERS, getAmountsForBurn } from "@zylith/sdk";
 import type { PositionNote, PoolKey } from "@zylith/sdk";
@@ -92,6 +94,17 @@ export function PositionsPage() {
     }
   };
 
+  // Compute estimated burn amounts when a position is targeted for removal
+  const burnEstimates = useMemo(() => {
+    if (!burnTarget || !poolState) return null;
+    return getAmountsForBurn(
+      poolState.sqrtPrice,
+      burnTarget.tickLower,
+      burnTarget.tickUpper,
+      BigInt(burnTarget.liquidity),
+    );
+  }, [burnTarget, poolState]);
+
   const handleBurn = async () => {
     if (!burnTarget || !client) return;
 
@@ -115,9 +128,9 @@ export function PositionsPage() {
     let amount0Out = 0n;
     let amount1Out = 0n;
     try {
-      const poolState = await client.getPoolState(poolKey);
+      const currentPoolState = await client.getPoolState(poolKey);
       const amounts = getAmountsForBurn(
-        poolState.sqrtPrice,
+        currentPoolState.sqrtPrice,
         burnTarget.tickLower,
         burnTarget.tickUpper,
         BigInt(burnTarget.liquidity),
@@ -126,6 +139,12 @@ export function PositionsPage() {
       amount1Out = amounts.amount1;
     } catch (err) {
       console.warn("Could not fetch pool state for amount estimation, using 0", err);
+    }
+
+    // Validate: both amounts being 0 means something is wrong
+    if (amount0Out === 0n && amount1Out === 0n) {
+      toast("Cannot remove: estimated token amounts are both zero. Try again later.", "error");
+      return;
     }
 
     burn.mutate(
@@ -294,17 +313,47 @@ export function PositionsPage() {
             shielded notes in your vault.
           </p>
           {burnTarget && (
-            <div className="rounded-xl border border-white/5 bg-gradient-to-r from-surface-elevated/80 to-surface/30 p-5 p-4 text-sm mt-4">
+            <div className="rounded-xl border border-white/5 bg-gradient-to-r from-surface-elevated/80 to-surface/30 p-5 text-sm mt-4 space-y-3">
               <div className="flex justify-between">
                 <span className="text-xs font-semibold tracking-widest uppercase text-text-caption">Range</span>
                 <span className="text-sm font-bold text-text-display font-mono">
                   [{burnTarget.tickLower}, {burnTarget.tickUpper}]
                 </span>
               </div>
-              <div className="flex justify-between mt-3">
+              <div className="flex justify-between">
                 <span className="text-xs font-semibold tracking-widest uppercase text-text-caption">Liquidity</span>
                 <span className="text-sm font-bold text-text-display font-mono">{burnTarget.liquidity}</span>
               </div>
+              {burnEstimates && poolKey && (
+                <div className="border-t border-white/5 pt-3">
+                  <p className="text-xs font-semibold tracking-widest uppercase text-text-caption mb-2">Estimated Return</p>
+                  {burnEstimates.amount0 > 0n && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TokenIcon address={poolKey.token0} size="sm" />
+                        <span className="text-sm text-text-heading">{getTokenSymbol(poolKey.token0)}</span>
+                      </div>
+                      <span className="text-sm font-bold text-text-display font-mono">
+                        {formatTokenAmount(burnEstimates.amount0, 18)}
+                      </span>
+                    </div>
+                  )}
+                  {burnEstimates.amount1 > 0n && (
+                    <div className="flex items-center justify-between mt-2">
+                      <div className="flex items-center gap-2">
+                        <TokenIcon address={poolKey.token1} size="sm" />
+                        <span className="text-sm text-text-heading">{getTokenSymbol(poolKey.token1)}</span>
+                      </div>
+                      <span className="text-sm font-bold text-text-display font-mono">
+                        {formatTokenAmount(burnEstimates.amount1, 18)}
+                      </span>
+                    </div>
+                  )}
+                  {burnEstimates.amount0 === 0n && burnEstimates.amount1 === 0n && (
+                    <p className="text-xs text-signal-error">Both token amounts are zero — position may be out of range.</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <div className="flex gap-3">

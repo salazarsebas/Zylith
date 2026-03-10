@@ -19,7 +19,7 @@ export function AddLiquidityCard() {
 
   const [amount0, setAmount0] = useState("");
   const [amount1, setAmount1] = useState("");
-  const [tickLower, setTickLower] = useState("-600");
+  const [tickLower, setTickLower] = useState("-69120");
   const [tickUpper, setTickUpper] = useState("600");
 
   const mint = useMint();
@@ -129,7 +129,7 @@ export function AddLiquidityCard() {
                   }} placeholder="600" className="h-12 text-center font-mono text-lg bg-surface/50 border-white/10" />
                 </div>
               </div>
-              <p className="text-[10px] uppercase tracking-wider text-text-disabled pt-2 border-t border-white/5">Suggested: -600 to 600 (full range)</p>
+              <p className="text-[10px] uppercase tracking-wider text-text-disabled pt-2 border-t border-white/5">Ticks must be multiples of 60. Current tick: -69082</p>
             </div>
 
             {parsedAmount0 > 0n && !note0 && (

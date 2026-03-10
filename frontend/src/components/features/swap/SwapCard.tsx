@@ -13,7 +13,7 @@ import { useSdkStore } from "@/stores/sdkStore";
 import { TESTNET_TOKENS, type Token } from "@/config/tokens";
 import { parseTokenAmount, formatTokenAmount } from "@/lib/format";
 import { calculatePriceImpact, getPriceImpactVariant } from "@/lib/priceImpact";
-import { FEE_TIERS } from "@zylith/sdk";
+import { FEE_TIERS, estimateSwapOutputSafe } from "@zylith/sdk";
 import type { Note, PoolKey } from "@zylith/sdk";
 import { cn } from "@/lib/cn";
 import { motion, AnimatePresence } from "motion/react";
@@ -90,6 +90,13 @@ export function SwapCard() {
   } : null;
   const { data: poolState } = usePoolState(poolKey);
 
+  // Estimate output amount with slippage buffer
+  const estimatedOut = useMemo(() => {
+    if (!poolState || parsedAmountIn === 0n || !tokenIn || !tokenOut) return 0n;
+    const zeroForOne = BigInt(tokenIn.address) < BigInt(tokenOut.address);
+    return estimateSwapOutputSafe(poolState.sqrtPrice, parsedAmountIn, zeroForOne, FEE_TIERS.MEDIUM.fee);
+  }, [poolState, parsedAmountIn, tokenIn, tokenOut]);
+
   // Calculate price impact
   const priceImpact = useMemo(() => {
     if (!poolState || parsedAmountIn === 0n) return 0;
@@ -156,6 +163,29 @@ export function SwapCard() {
           ? [tokenIn.address, tokenOut.address]
           : [tokenOut.address, tokenIn.address];
 
+      // Determine swap direction: zeroForOne = tokenIn is token0
+      const zeroForOne = BigInt(tokenIn.address) < BigInt(tokenOut.address);
+
+      // Estimate expected output using current pool state with slippage buffer.
+      // The safe estimate is conservative — if on-chain output < committed amount,
+      // the tx reverts (no loss). If output > committed, excess stays in pool.
+      let expectedOut = 0n;
+      if (poolState) {
+        expectedOut = estimateSwapOutputSafe(
+          poolState.sqrtPrice,
+          parsedAmountIn,
+          zeroForOne,
+          FEE_TIERS.MEDIUM.fee,
+        );
+      }
+
+      // sqrtPriceLimit: use min/max tick sqrt price to allow full range
+      // zeroForOne pushes price down → use MIN_SQRT_PRICE + 1
+      // oneForZero pushes price up → use MAX_SQRT_PRICE - 1
+      const MIN_SQRT_PRICE = 18446748437148339061n; // tick MIN
+      const MAX_SQRT_PRICE = 6277100124014414463012959019843661850313428390744n; // tick MAX
+      const priceLimit = zeroForOne ? MIN_SQRT_PRICE : MAX_SQRT_PRICE;
+
       swap.mutate(
         {
           poolKey: {
@@ -168,9 +198,9 @@ export function SwapCard() {
           tokenIn: tokenIn.address,
           tokenOut: tokenOut.address,
           amountIn: parsedAmountIn,
-          amountOutMin: 0n,
-          expectedAmountOut: 0n,
-          sqrtPriceLimit: 0n,
+          amountOutMin: expectedOut,
+          expectedAmountOut: expectedOut,
+          sqrtPriceLimit: priceLimit,
         },
         {
           onSuccess: (data) => {
@@ -273,10 +303,10 @@ export function SwapCard() {
 
             {/* Token Out */}
             <AmountInput
-              label="You receive"
+              label="You receive (est.)"
               placeholder="0.0"
               readOnly
-              value="—"
+              value={estimatedOut > 0n ? formatTokenAmount(estimatedOut, tokenOut?.decimals ?? 18) : "—"}
               tokenAddress={tokenOut?.address}
               onTokenClick={() => {
                 setSelectingTokenType("out");
